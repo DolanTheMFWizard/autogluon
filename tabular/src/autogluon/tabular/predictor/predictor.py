@@ -274,7 +274,7 @@ class TabularPredictor:
 
     # TODO!!!: This is a hacky way to pseudo-label need to fix
     def bad_pseudo_fit(self, train_data, test_data, validation_data, init_kwargs=None, fit_kwargs=None,
-                       max_iter: bool = 1, reuse_pred_test: bool = False, threshold: float = 0.9):
+                       max_iter: bool = 1, reuse_pred_test: bool = False, threshold: float = 0.9, **kwargs):
 
         if init_kwargs is None:
             init_kwargs = dict()
