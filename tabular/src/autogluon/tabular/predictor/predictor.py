@@ -275,15 +275,16 @@ class TabularPredictor:
     # TODO!!!: This is a hacky way to pseudo-label need to fix
     def bad_pseudo_fit(self, train_data, test_data, validation_data, init_kwargs=None, fit_kwargs=None,
                        max_iter: bool = 1, reuse_pred_test: bool = False, threshold: float = 0.9):
-        from pseudo_label import filter_pseudo
-        self.fit(train_data, **fit_kwargs)
-        y_pred_proba_og = self.predict_proba(test_data)
-        y_pred_og = self.predict(test_data)
 
         if init_kwargs is None:
             init_kwargs = dict()
         if fit_kwargs is None:
             fit_kwargs = dict()
+
+        from pseudo_label import filter_pseudo
+        self.fit(train_data, **fit_kwargs)
+        y_pred_proba_og = self.predict_proba(test_data)
+        y_pred_og = self.predict(test_data)
 
         y_pred = y_pred_og.copy()
         y_pred_proba = y_pred_proba_og.copy()
