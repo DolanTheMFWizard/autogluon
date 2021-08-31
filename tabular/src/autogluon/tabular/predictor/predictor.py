@@ -293,7 +293,7 @@ class TabularPredictor:
 
         for i in range(max_iter):
             # Finds pseudo labeling rows that are above threshold
-            test_pseudo_indices_true = filter_pseudo(y_pred_proba_holdout, problem_type=problem_type,
+            test_pseudo_indices_true = filter_pseudo(y_pred_proba_holdout, problem_type=self.problem_type,
                                                      threshold=threshold)
             test_pseudo_indices = pd.Series(data=False, index=y_pred_proba_holdout.index)
             test_pseudo_indices[test_pseudo_indices_true.index] = True
