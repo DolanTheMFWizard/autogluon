@@ -218,11 +218,11 @@ if __name__ == "__main__":
             assert not test_data.index.equals(validation_data.index)
             assert not train_data.index.equals(validation_data.index)
 
-            agp = TabularPredictor(label=label).fit(train_data=train_data, tuning_data=validation_data)
-            agp_pred = agp.predict(test_data)
-
-            vanilla_acc = accuracy_score(agp_pred.to_numpy(), test_split[label].to_numpy())
-            score_tracker.add(agp, vanilla_acc, ep)
+            # agp = TabularPredictor(label=label).fit(train_data=train_data, tuning_data=validation_data)
+            # agp_pred = agp.predict(test_data)
+            #
+            # vanilla_acc = accuracy_score(agp_pred.to_numpy(), test_split[label].to_numpy())
+            # score_tracker.add(agp, vanilla_acc, ep)
             for is_reuse in reuse_list:
                 for t in threshold_list:
                     final_predict, best_model = TabularPredictor(label=label).bad_pseudo_fit(train_data=train_data,
