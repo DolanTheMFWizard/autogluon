@@ -168,7 +168,8 @@ class Metrics:
 
 
 if __name__ == "__main__":
-    # parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--openml_id', type=int, help='OpenML id to run on', default=1560)
     # parser.add_argument('--id', type=str, help='id given to this runs results', default='no_name')
     # parser.add_argument('--threshold', type=float,
     #                     help='Predictive probability threshold to be above in order to use for pseudo-labeling',
@@ -180,7 +181,7 @@ if __name__ == "__main__":
     #                     default=True)
     # parser.add_argument('--validation_percent', type=float, help='What percent of train should be used for validation',
     #                     default=0.15)
-    # args = parser.parse_args()
+    args = parser.parse_args()
 
     val_percent_list = [0.2]
     eval_percent_list = [0.25, 0.5, 0.75, 0.95]
@@ -192,7 +193,7 @@ if __name__ == "__main__":
     else:
         reuse_list = [True, False]
 
-    openml_id = 300  # 1596
+    openml_id = args.openml_id
     data = fetch_openml(data_id=openml_id, as_frame=True)
     features = data['data']
     target = data['target']
