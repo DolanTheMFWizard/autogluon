@@ -19,7 +19,7 @@ def fit_pseudo_end_to_end(train_data, test_data, validation_data, label, init_kw
     y_pred_proba_og = predictor.predict_proba(test_data)
     y_pred_og = predictor.predict(test_data)
 
-    y_pred_proba, best_model, total_iter = fit_pseudo_given_preds(train_data=train_data,
+    y_pred_proba, best_model = fit_pseudo_given_preds(train_data=train_data,
                                                                   test_data=test_data,
                                                                   y_pred_proba_og=y_pred_proba_og,
                                                                   y_pred_og=y_pred_og,
@@ -39,7 +39,7 @@ def fit_pseudo_end_to_end(train_data, test_data, validation_data, label, init_kw
     # print(f'score_ps: {score_ps}')
     #######
 
-    return y_pred_proba, best_model, total_iter
+    return y_pred_proba, best_model
 
 
 def fit_pseudo_given_preds(train_data, validation_data, test_data, y_pred_proba_og, y_pred_og, problem_type, label,
@@ -169,7 +169,7 @@ class Metrics:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--openml_id', type=int, help='OpenML id to run on', default=1560)
+    parser.add_argument('--openml_id', type=int, help='OpenML id to run on', default=32)
     # parser.add_argument('--id', type=str, help='id given to this runs results', default='no_name')
     # parser.add_argument('--threshold', type=float,
     #                     help='Predictive probability threshold to be above in order to use for pseudo-labeling',
