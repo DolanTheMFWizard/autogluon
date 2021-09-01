@@ -281,7 +281,6 @@ class TabularPredictor:
         if fit_kwargs is None:
             fit_kwargs = dict()
 
-        from pseudo_label import filter_pseudo
         self.fit(train_data, **fit_kwargs)
         y_pred_proba_og = self.predict_proba(test_data)
         y_pred_og = self.predict(test_data)
@@ -339,6 +338,36 @@ class TabularPredictor:
                 break
 
         return best_model, y_pred
+
+    def filter_pseudo(self, y_pred_proba_og, problem_type, min_percentage: float = 0.05, max_percentage: float = 0.6,
+                      threshold: float = 0.9):
+        if problem_type in ['binary', 'multiclass']:
+            y_pred_proba_max = y_pred_proba_og.max(axis=1)
+            curr_threshold = threshold
+            # Percent of rows above threshold
+            curr_percentage = (y_pred_proba_max >= curr_threshold).mean()
+            num_rows = len(y_pred_proba_max)
+
+            if curr_percentage > max_percentage or curr_percentage < min_percentage:
+                if curr_percentage > max_percentage:
+                    num_rows_threshold = max(np.ceil(max_percentage * num_rows), 1)
+                else:
+                    num_rows_threshold = max(np.ceil(min_percentage * num_rows), 1)
+                y_pred_proba_max_sorted = y_pred_proba_max.sort_values(ascending=False, ignore_index=True)
+                # Set current threshold to num_rows_threshold - 1
+                curr_threshold = y_pred_proba_max_sorted[num_rows_threshold - 1]
+
+            # Pseudo indices greater than threshold of 0.95
+            test_pseudo_indices = (y_pred_proba_max >= curr_threshold)
+        else:
+            # Select a random 30% of the data to use as pseudo
+            test_pseudo_indices = pd.Series(data=False, index=y_pred_proba_og.index)
+            test_pseudo_indices_true = test_pseudo_indices.sample(frac=0.3, random_state=0)
+            test_pseudo_indices[test_pseudo_indices_true.index] = True
+
+        test_pseudo_indices = test_pseudo_indices[test_pseudo_indices]
+
+        return test_pseudo_indices
 
     @apply_presets(tabular_presets_dict)
     def fit(self,
