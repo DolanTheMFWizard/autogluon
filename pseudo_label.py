@@ -39,7 +39,7 @@ def fit_pseudo_end_to_end(train_data, test_data, validation_data, label, init_kw
     # print(f'score_ps: {score_ps}')
     #######
 
-    return y_pred_proba, best_model, total_iter
+    return y_pred_proba, best_model
 
 
 def fit_pseudo_given_preds(train_data, validation_data, test_data, y_pred_proba_og, y_pred_og, problem_type, label,
