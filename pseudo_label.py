@@ -228,7 +228,7 @@ if __name__ == "__main__":
                     # final_predict, best_model = TabularPredictor(label=label).bad_pseudo_fit(train_data=train_data,
                     #                                                                          test_data=test_data,
                     #                                                                          validation_data=validation_data)
-                    test_pred, best_model, total_iter = fit_pseudo_end_to_end(train_data=train_data,
+                    test_pred, best_model = fit_pseudo_end_to_end(train_data=train_data,
                                                                               validation_data=validation_data,
                                                                               test_data=test_data, label=label,
                                                                               max_iter=max_iter,
