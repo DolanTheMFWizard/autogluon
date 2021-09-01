@@ -274,11 +274,8 @@ class TabularPredictor:
         return self._learner.path
 
     # TODO!!!: This is a hacky way to pseudo-label need to fix
-    def bad_pseudo_fit(self, train_data, test_data, validation_data, init_kwargs=None, fit_kwargs=None,
-                       max_iter: bool = 1, reuse_pred_test: bool = False, threshold: float = 0.9, **kwargs):
-
-        if init_kwargs is None:
-            init_kwargs = dict()
+    def bad_pseudo_fit(self, train_data, test_data, validation_data, fit_kwargs=None,
+                       max_iter: bool = 1, reuse_pred_test: bool = False, threshold: float = 0.9):
         if fit_kwargs is None:
             fit_kwargs = dict()
 
@@ -310,7 +307,7 @@ class TabularPredictor:
                 test_data_holdout = test_data.copy()
                 test_data_holdout = test_data_holdout.loc[test_pseudo_indices[~test_pseudo_indices].index]
                 # predictor_pseudo = TabularPredictor(label=label, **init_kwargs).fit(train_data = train_data, **fit_kwargs)
-                predictor_pseudo = self.fit(train_data=curr_train_data, tuning_data=validation_data, **fit_kwargs)
+                predictor_pseudo = TabularPredictor(label=self.label).fit(train_data=curr_train_data, tuning_data=validation_data, **fit_kwargs)
                 curr_score = self.info()['best_model_score_val']
 
                 if curr_score > previous_score:
