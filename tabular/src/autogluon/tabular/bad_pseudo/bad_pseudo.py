@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 from ..predictor.predictor import TabularPredictor
 
+
 def fit_pseudo_end_to_end(train_data, test_data, validation_data, label, init_kwargs=None, fit_kwargs=None,
                           max_iter: bool = 1, reuse_pred_test: bool = False, threshold: float = 0.9):
     if init_kwargs is None:
@@ -98,7 +99,7 @@ def fit_pseudo_given_preds(train_data, validation_data, test_data, y_pred_proba_
         else:
             break
 
-    return y_pred_proba, best_model, i
+    return best_model
 
 
 def filter_pseudo(y_pred_proba_og, problem_type, min_percentage: float = 0.05, max_percentage: float = 0.6,
