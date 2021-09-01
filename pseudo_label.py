@@ -102,7 +102,7 @@ def fit_pseudo_given_preds(train_data, validation_data, test_data, y_pred_proba_
         else:
             break
 
-    return y_pred_proba, best_model, i
+    return y_pred_proba, best_model
 
 
 def filter_pseudo(y_pred_proba_og, problem_type, min_percentage: float = 0.05, max_percentage: float = 0.6,
@@ -225,15 +225,15 @@ if __name__ == "__main__":
             score_tracker.add(agp, vanilla_acc, ep)
             for is_reuse in reuse_list:
                 for t in threshold_list:
-                    final_predict, best_model = TabularPredictor(label=label).bad_pseudo_fit(train_data=train_data,
-                                                                                             test_data=test_data,
-                                                                                             validation_data=validation_data)
-                    # test_pred, best_model, total_iter = fit_pseudo_end_to_end(train_data=train_data,
-                    #                                                           validation_data=validation_data,
-                    #                                                           test_data=test_data, label=label,
-                    #                                                           max_iter=max_iter,
-                    #                                                           reuse_pred_test=is_reuse, threshold=t)
-                    # final_predict = test_pred.idxmax(axis=1)
+                    # final_predict, best_model = TabularPredictor(label=label).bad_pseudo_fit(train_data=train_data,
+                    #                                                                          test_data=test_data,
+                    #                                                                          validation_data=validation_data)
+                    test_pred, best_model, total_iter = fit_pseudo_end_to_end(train_data=train_data,
+                                                                              validation_data=validation_data,
+                                                                              test_data=test_data, label=label,
+                                                                              max_iter=max_iter,
+                                                                              reuse_pred_test=is_reuse, threshold=t)
+                    final_predict = test_pred.idxmax(axis=1)
                     pseudo_label_acc = accuracy_score(final_predict.to_numpy(), test_split[label].to_numpy())
                     score_tracker.add(best_model, pseudo_label_acc, ep, is_reuse, t)
 
