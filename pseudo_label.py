@@ -170,6 +170,7 @@ class Metrics:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--openml_id', type=int, help='OpenML id to run on', default=32)
+    parser.add_argument('--best', type=bool, help='Set model to best quality', default=False)
     # parser.add_argument('--id', type=str, help='id given to this runs results', default='no_name')
     # parser.add_argument('--threshold', type=float,
     #                     help='Predictive probability threshold to be above in order to use for pseudo-labeling',
@@ -186,6 +187,7 @@ if __name__ == "__main__":
     val_percent_list = [0.2]
     eval_percent_list = [0.25, 0.5, 0.75, 0.95]
     threshold_list = [0.5, 0.75, 0.9, 0.95]
+    fit_args = dict(presets='best_quality') if args.best else dict()
     max_iter = 1
 
     if max_iter > 1:
@@ -218,7 +220,7 @@ if __name__ == "__main__":
             assert not test_data.index.equals(validation_data.index)
             assert not train_data.index.equals(validation_data.index)
 
-            agp = TabularPredictor(label=label).fit(train_data=train_data, tuning_data=validation_data)
+            agp = TabularPredictor(label=label).fit(train_data=train_data, tuning_data=validation_data, **fit_args)
             agp_pred = agp.predict(test_data)
 
             vanilla_acc = accuracy_score(agp_pred.to_numpy(), test_split[label].to_numpy())
@@ -232,7 +234,7 @@ if __name__ == "__main__":
                                                                               validation_data=validation_data,
                                                                               test_data=test_data, label=label,
                                                                               max_iter=max_iter,
-                                                                              reuse_pred_test=is_reuse, threshold=t)
+                                                                              reuse_pred_test=is_reuse, threshold=t, fit_kwargs=fit_args)
                     final_predict = test_pred.idxmax(axis=1)
                     pseudo_label_acc = accuracy_score(final_predict.to_numpy(), test_split[label].to_numpy())
                     score_tracker.add(best_model, pseudo_label_acc, ep, is_reuse, t)
