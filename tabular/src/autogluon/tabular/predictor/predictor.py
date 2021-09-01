@@ -1,3 +1,4 @@
+import unittest
 import copy
 import logging
 import os
@@ -273,15 +274,11 @@ class TabularPredictor:
         return self._learner.path
 
     # TODO!!!: This is a hacky way to pseudo-label need to fix
-    def bad_pseudo_fit(self, train_data, test_data, validation_data, init_kwargs=None, fit_kwargs=None,
+    def bad_pseudo_fit(self, train_data, test_data, validation_data, fit_kwargs=None,
                        max_iter: bool = 1, reuse_pred_test: bool = False, threshold: float = 0.9):
-
-        if init_kwargs is None:
-            init_kwargs = dict()
         if fit_kwargs is None:
             fit_kwargs = dict()
 
-        from pseudo_label import filter_pseudo
         self.fit(train_data, **fit_kwargs)
         y_pred_proba_og = self.predict_proba(test_data)
         y_pred_og = self.predict(test_data)
@@ -293,7 +290,7 @@ class TabularPredictor:
 
         for i in range(max_iter):
             # Finds pseudo labeling rows that are above threshold
-            test_pseudo_indices_true = filter_pseudo(y_pred_proba_holdout, problem_type=self.problem_type,
+            test_pseudo_indices_true = self.filter_pseudo(y_pred_proba_holdout, problem_type=self.problem_type,
                                                      threshold=threshold)
             test_pseudo_indices = pd.Series(data=False, index=y_pred_proba_holdout.index)
             test_pseudo_indices[test_pseudo_indices_true.index] = True
@@ -310,7 +307,7 @@ class TabularPredictor:
                 test_data_holdout = test_data.copy()
                 test_data_holdout = test_data_holdout.loc[test_pseudo_indices[~test_pseudo_indices].index]
                 # predictor_pseudo = TabularPredictor(label=label, **init_kwargs).fit(train_data = train_data, **fit_kwargs)
-                predictor_pseudo = self.fit(train_data=curr_train_data, tuning_data=validation_data, **fit_kwargs)
+                predictor_pseudo = TabularPredictor(label=self.label).fit(train_data=curr_train_data, tuning_data=validation_data, **fit_kwargs)
                 curr_score = self.info()['best_model_score_val']
 
                 if curr_score > previous_score:
@@ -339,6 +336,36 @@ class TabularPredictor:
                 break
 
         return best_model, y_pred
+
+    def filter_pseudo(self, y_pred_proba_og, problem_type, min_percentage: float = 0.05, max_percentage: float = 0.6,
+                      threshold: float = 0.9):
+        if problem_type in ['binary', 'multiclass']:
+            y_pred_proba_max = y_pred_proba_og.max(axis=1)
+            curr_threshold = threshold
+            # Percent of rows above threshold
+            curr_percentage = (y_pred_proba_max >= curr_threshold).mean()
+            num_rows = len(y_pred_proba_max)
+
+            if curr_percentage > max_percentage or curr_percentage < min_percentage:
+                if curr_percentage > max_percentage:
+                    num_rows_threshold = max(np.ceil(max_percentage * num_rows), 1)
+                else:
+                    num_rows_threshold = max(np.ceil(min_percentage * num_rows), 1)
+                y_pred_proba_max_sorted = y_pred_proba_max.sort_values(ascending=False, ignore_index=True)
+                # Set current threshold to num_rows_threshold - 1
+                curr_threshold = y_pred_proba_max_sorted[num_rows_threshold - 1]
+
+            # Pseudo indices greater than threshold of 0.95
+            test_pseudo_indices = (y_pred_proba_max >= curr_threshold)
+        else:
+            # Select a random 30% of the data to use as pseudo
+            test_pseudo_indices = pd.Series(data=False, index=y_pred_proba_og.index)
+            test_pseudo_indices_true = test_pseudo_indices.sample(frac=0.3, random_state=0)
+            test_pseudo_indices[test_pseudo_indices_true.index] = True
+
+        test_pseudo_indices = test_pseudo_indices[test_pseudo_indices]
+
+        return test_pseudo_indices
 
     @apply_presets(tabular_presets_dict)
     def fit(self,
