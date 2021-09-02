@@ -4,7 +4,7 @@ import numpy as np
 from ..predictor.predictor import TabularPredictor
 
 
-def fit_pseudo_end_to_end(train_data, test_data, validation_data, label init_kwargs=None, fit_kwargs=None,
+def fit_pseudo_end_to_end(train_data, test_data, validation_data, label, init_kwargs=None, fit_kwargs=None,
                           max_iter: bool = 1, reuse_pred_test: bool = False, threshold: float = 0.9):
     if init_kwargs is None:
         init_kwargs = dict()
