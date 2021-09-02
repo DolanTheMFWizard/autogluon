@@ -4,14 +4,14 @@ import numpy as np
 from ..predictor.predictor import TabularPredictor
 
 
-def fit_pseudo_end_to_end(train_data, test_data, validation_data, init_kwargs=None, fit_kwargs=None,
+def fit_pseudo_end_to_end(train_data, test_data, validation_data, label init_kwargs=None, fit_kwargs=None,
                           max_iter: bool = 1, reuse_pred_test: bool = False, threshold: float = 0.9):
     if init_kwargs is None:
         init_kwargs = dict()
     if fit_kwargs is None:
         fit_kwargs = dict()
 
-    predictor = TabularPredictor(label=init_kwargs['label'], **init_kwargs).fit(train_data, **fit_kwargs)
+    predictor = TabularPredictor(label=label, **init_kwargs).fit(train_data, **fit_kwargs)
 
     y_pred_proba_og = predictor.predict_proba(test_data)
     y_pred_og = predictor.predict(test_data)
