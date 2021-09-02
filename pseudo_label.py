@@ -239,4 +239,5 @@ if __name__ == "__main__":
                     pseudo_label_acc = accuracy_score(final_predict.to_numpy(), test_split[label].to_numpy())
                     score_tracker.add(best_model, pseudo_label_acc, ep, is_reuse, t)
 
-    score_tracker.generate_csv(f'./results/openml{openml_id}_results_iter{max_iter}.csv')
+    bagged_label = '_bagged' if args.best else ''
+    score_tracker.generate_csv(f'./results/openml{openml_id}_results_iter{max_iter}{bagged_label}.csv')
