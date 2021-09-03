@@ -201,7 +201,7 @@ if __name__ == "__main__":
     data = fetch_openml(data_id=openml_id, as_frame=True)
     features = data['data']
     target = data['target']
-    label = 'class'
+    label = data['target_names'][0]
     df = features.join(target)
     num_rows = len(df)
     score_tracker = Metrics()
