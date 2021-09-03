@@ -1,33 +1,36 @@
 import unittest
-import pandas as pd
+
 import numpy as np
+import pandas as pd
+
 from ..predictor.predictor import TabularPredictor
 
 
-def fit_pseudo_end_to_end(train_data, test_data, validation_data, init_kwargs=None, fit_kwargs=None,
+def fit_pseudo_end_to_end(train_data, test_data, validation_data, label, init_kwargs=None, fit_kwargs=None,
                           max_iter: bool = 1, reuse_pred_test: bool = False, threshold: float = 0.9):
     if init_kwargs is None:
         init_kwargs = dict()
     if fit_kwargs is None:
         fit_kwargs = dict()
 
-    predictor = TabularPredictor(label=init_kwargs['label'], **init_kwargs).fit(train_data, **fit_kwargs)
+    predictor = TabularPredictor(label=label, **init_kwargs).fit(train_data, **fit_kwargs)
 
     y_pred_proba_og = predictor.predict_proba(test_data)
     y_pred_og = predictor.predict(test_data)
 
-    y_pred_proba, best_model, total_iter = fit_pseudo_given_preds(train_data=train_data,
-                                                                  test_data=test_data,
-                                                                  y_pred_proba_og=y_pred_proba_og,
-                                                                  y_pred_og=y_pred_og,
-                                                                  problem_type=predictor.problem_type,
-                                                                  label=label,
-                                                                  validation_data=validation_data,
-                                                                  init_kwargs=init_kwargs,
-                                                                  fit_kwargs=fit_kwargs,
-                                                                  max_iter=max_iter,
-                                                                  reuse_pred_test=reuse_pred_test,
-                                                                  threshold=threshold)
+    # y_pred_proba, best_model, total_iter
+    best_model = fit_pseudo_given_preds(train_data=train_data,
+                                        test_data=test_data,
+                                        y_pred_proba_og=y_pred_proba_og,
+                                        y_pred_og=y_pred_og,
+                                        problem_type=predictor.problem_type,
+                                        label=label,
+                                        validation_data=validation_data,
+                                        init_kwargs=init_kwargs,
+                                        fit_kwargs=fit_kwargs,
+                                        max_iter=max_iter,
+                                        reuse_pred_test=reuse_pred_test,
+                                        threshold=threshold)
 
     #######
     # score_og = predictor.evaluate_predictions(y_true=test_data[label], y_pred=y_pred_proba_og)
@@ -36,7 +39,8 @@ def fit_pseudo_end_to_end(train_data, test_data, validation_data, init_kwargs=No
     # print(f'score_ps: {score_ps}')
     #######
 
-    return y_pred_proba, best_model, total_iter
+    return best_model
+    # return y_pred_proba, best_model, total_iter
 
 
 def fit_pseudo_given_preds(train_data, validation_data, test_data, y_pred_proba_og, y_pred_og, problem_type, label,
