@@ -1,45 +1,46 @@
-import unittest
 import argparse
-import pandas as pd
+import unittest
+
 import numpy as np
+import pandas as pd
+from autogluon.tabular import TabularPredictor, fit_pseudo_end_to_end
 from sklearn.datasets import fetch_openml
 from sklearn.metrics import accuracy_score
-from autogluon.tabular import TabularPredictor
+from openml_meta import generate_openml_meta
 
-
-def fit_pseudo_end_to_end(train_data, test_data, validation_data, label, init_kwargs=None, fit_kwargs=None,
-                          max_iter: bool = 1, reuse_pred_test: bool = False, threshold: float = 0.9):
-    if init_kwargs is None:
-        init_kwargs = dict()
-    if fit_kwargs is None:
-        fit_kwargs = dict()
-
-    predictor = TabularPredictor(label=label, **init_kwargs).fit(train_data, **fit_kwargs)
-
-    y_pred_proba_og = predictor.predict_proba(test_data)
-    y_pred_og = predictor.predict(test_data)
-
-    y_pred_proba, best_model = fit_pseudo_given_preds(train_data=train_data,
-                                                                  test_data=test_data,
-                                                                  y_pred_proba_og=y_pred_proba_og,
-                                                                  y_pred_og=y_pred_og,
-                                                                  problem_type=predictor.problem_type,
-                                                                  label=label,
-                                                                  validation_data=validation_data,
-                                                                  init_kwargs=init_kwargs,
-                                                                  fit_kwargs=fit_kwargs,
-                                                                  max_iter=max_iter,
-                                                                  reuse_pred_test=reuse_pred_test,
-                                                                  threshold=threshold)
-
-    #######
-    # score_og = predictor.evaluate_predictions(y_true=test_data[label], y_pred=y_pred_proba_og)
-    # score_ps = predictor.evaluate_predictions(y_true=test_data[label], y_pred=y_pred_proba)
-    # print(f'score_og: {score_og}')
-    # print(f'score_ps: {score_ps}')
-    #######
-
-    return y_pred_proba, best_model
+# def fit_pseudo_end_to_end(train_data, test_data, validation_data, label, init_kwargs=None, fit_kwargs=None,
+#                           max_iter: bool = 1, reuse_pred_test: bool = False, threshold: float = 0.9):
+#     if init_kwargs is None:
+#         init_kwargs = dict()
+#     if fit_kwargs is None:
+#         fit_kwargs = dict()
+#
+#     predictor = TabularPredictor(label=label, **init_kwargs).fit(train_data, **fit_kwargs)
+#
+#     y_pred_proba_og = predictor.predict_proba(test_data)
+#     y_pred_og = predictor.predict(test_data)
+#
+#     y_pred_proba, best_model = fit_pseudo_given_preds(train_data=train_data,
+#                                                                   test_data=test_data,
+#                                                                   y_pred_proba_og=y_pred_proba_og,
+#                                                                   y_pred_og=y_pred_og,
+#                                                                   problem_type=predictor.problem_type,
+#                                                                   label=label,
+#                                                                   validation_data=validation_data,
+#                                                                   init_kwargs=init_kwargs,
+#                                                                   fit_kwargs=fit_kwargs,
+#                                                                   max_iter=max_iter,
+#                                                                   reuse_pred_test=reuse_pred_test,
+#                                                                   threshold=threshold)
+#
+#     #######
+#     # score_og = predictor.evaluate_predictions(y_true=test_data[label], y_pred=y_pred_proba_og)
+#     # score_ps = predictor.evaluate_predictions(y_true=test_data[label], y_pred=y_pred_proba)
+#     # print(f'score_og: {score_og}')
+#     # print(f'score_ps: {score_ps}')
+#     #######
+#
+#     return y_pred_proba, best_model
 
 
 def fit_pseudo_given_preds(train_data, validation_data, test_data, y_pred_proba_og, y_pred_og, problem_type, label,
@@ -184,6 +185,7 @@ if __name__ == "__main__":
     #                     default=0.15)
     args = parser.parse_args()
 
+    generate_openml_meta(args.openml_id)
     val_percent_list = [0.2]
     eval_percent_list = [0.25, 0.5, 0.75, 0.95]
     threshold_list = [0.5, 0.75, 0.9, 0.95]
@@ -231,10 +233,11 @@ if __name__ == "__main__":
                     #                                                                          test_data=test_data,
                     #                                                                          validation_data=validation_data)
                     test_pred, best_model = fit_pseudo_end_to_end(train_data=train_data,
-                                                                              validation_data=validation_data,
-                                                                              test_data=test_data, label=label,
-                                                                              max_iter=max_iter,
-                                                                              reuse_pred_test=is_reuse, threshold=t, fit_kwargs=fit_args)
+                                                                  validation_data=validation_data,
+                                                                  test_data=test_data, label=label,
+                                                                  max_iter=max_iter,
+                                                                  reuse_pred_test=is_reuse, threshold=t,
+                                                                  fit_kwargs=fit_args)
                     final_predict = test_pred.idxmax(axis=1)
                     pseudo_label_acc = accuracy_score(final_predict.to_numpy(), test_split[label].to_numpy())
                     score_tracker.add(best_model, pseudo_label_acc, ep, is_reuse, t)
