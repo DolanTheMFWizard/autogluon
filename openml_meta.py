@@ -8,14 +8,13 @@ from sklearn.datasets import fetch_openml
 def generate_openml_meta(openml_id: int):
     data = fetch_openml(data_id=openml_id, as_frame=True)
     column_list = data['feature_names']
-
+    num_rows = len(data['target'])
+    num_classes = data['target'].nunique()
     num_unique_nominal_feat = list()
     num_unique_numeric_feat = list()
 
     for col in column_list:
-        num_rows = len(data['target'])
         column_data = data['data'][col]
-        num_classes = data['target'].nunique()
         dtype = str(column_data.dtype)
         n_unique = column_data.nunique()
 
