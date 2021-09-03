@@ -6,10 +6,13 @@ import pandas as pd
 from autogluon.tabular import TabularPredictor
 from sklearn.datasets import fetch_openml
 from sklearn.metrics import accuracy_score
+
 from openml_meta import generate_openml_meta
 
+
 def fit_pseudo_end_to_end(train_data, test_data, validation_data, label, init_kwargs=None, fit_kwargs=None,
-                          max_iter: bool = 1, reuse_pred_test: bool = False, threshold: float = 0.9):
+                          max_iter: bool = 1, reuse_pred_test: bool = False, threshold: float = 0.9,
+                          test_only: bool = False):
     if init_kwargs is None:
         init_kwargs = dict()
     if fit_kwargs is None:
@@ -21,17 +24,18 @@ def fit_pseudo_end_to_end(train_data, test_data, validation_data, label, init_kw
     y_pred_og = predictor.predict(test_data)
 
     y_pred_proba, best_model = fit_pseudo_given_preds(train_data=train_data,
-                                                                  test_data=test_data,
-                                                                  y_pred_proba_og=y_pred_proba_og,
-                                                                  y_pred_og=y_pred_og,
-                                                                  problem_type=predictor.problem_type,
-                                                                  label=label,
-                                                                  validation_data=validation_data,
-                                                                  init_kwargs=init_kwargs,
-                                                                  fit_kwargs=fit_kwargs,
-                                                                  max_iter=max_iter,
-                                                                  reuse_pred_test=reuse_pred_test,
-                                                                  threshold=threshold)
+                                                      test_data=test_data,
+                                                      y_pred_proba_og=y_pred_proba_og,
+                                                      y_pred_og=y_pred_og,
+                                                      problem_type=predictor.problem_type,
+                                                      label=label,
+                                                      validation_data=validation_data,
+                                                      init_kwargs=init_kwargs,
+                                                      fit_kwargs=fit_kwargs,
+                                                      max_iter=max_iter,
+                                                      reuse_pred_test=reuse_pred_test,
+                                                      threshold=threshold,
+                                                      test_only=test_only)
 
     #######
     # score_og = predictor.evaluate_predictions(y_true=test_data[label], y_pred=y_pred_proba_og)
@@ -45,7 +49,7 @@ def fit_pseudo_end_to_end(train_data, test_data, validation_data, label, init_kw
 
 def fit_pseudo_given_preds(train_data, validation_data, test_data, y_pred_proba_og, y_pred_og, problem_type, label,
                            init_kwargs=None,
-                           fit_kwargs=None, max_iter=1, reuse_pred_test: bool = False, threshold: float = .9):
+                           fit_kwargs=None, max_iter=1, reuse_pred_test: bool = False, threshold: float = .9, test_only: bool = False):
     if init_kwargs is None:
         init_kwargs = dict()
     if fit_kwargs is None:
@@ -69,7 +73,10 @@ def fit_pseudo_given_preds(train_data, validation_data, test_data, y_pred_proba_
         test_data_pseudo = test_data_pseudo.loc[test_pseudo_indices_true.index]
 
         if len(test_data_pseudo) > 0:
-            curr_train_data = pd.concat([train_data, test_data_pseudo], ignore_index=True)
+            if test_only:
+                curr_train_data = test_data_pseudo
+            else:
+                curr_train_data = pd.concat([train_data, test_data_pseudo], ignore_index=True)
             # test_data_holdout is data that should not be added into train because didn't meet threshold
             test_data_holdout = test_data.copy()
             test_data_holdout = test_data_holdout.loc[test_pseudo_indices[~test_pseudo_indices].index]
@@ -172,6 +179,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--openml_id', type=int, help='OpenML id to run on', default=32)
     parser.add_argument('--best', type=bool, help='Set model to best quality', default=False)
+    parser.add_argument('--test_only', type=bool, help='Use test data only during refit', default=False)
     # parser.add_argument('--id', type=str, help='id given to this runs results', default='no_name')
     # parser.add_argument('--threshold', type=float,
     #                     help='Predictive probability threshold to be above in order to use for pseudo-labeling',
@@ -237,10 +245,11 @@ if __name__ == "__main__":
                                                                   test_data=test_data, label=label,
                                                                   max_iter=max_iter,
                                                                   reuse_pred_test=is_reuse, threshold=t,
-                                                                  fit_kwargs=fit_args)
+                                                                  fit_kwargs=fit_args, test_only=args.test_only)
                     final_predict = test_pred.idxmax(axis=1)
                     pseudo_label_acc = accuracy_score(final_predict.to_numpy(), test_split[label].to_numpy())
                     score_tracker.add(best_model, pseudo_label_acc, ep, is_reuse, t)
 
     bagged_label = '_bagged' if args.best else ''
-    score_tracker.generate_csv(f'./results/openml{openml_id}_results_iter{max_iter}{bagged_label}.csv')
+    test_only_label = '_testonly' if args.test_only else ''
+    score_tracker.generate_csv(f'./results/openml{openml_id}_results_iter{max_iter}{bagged_label}{test_only_label}.csv')
