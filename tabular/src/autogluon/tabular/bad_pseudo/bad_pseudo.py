@@ -13,7 +13,10 @@ def fit_pseudo_end_to_end(train_data, test_data, validation_data, label, init_kw
     if fit_kwargs is None:
         fit_kwargs = dict()
 
-    predictor = TabularPredictor(label=label, **init_kwargs).fit(train_data, **fit_kwargs)
+    if 'pseudo' not in fit_kwargs:
+        return TabularPredictor(label=label, **init_kwargs).fit(train_data, **fit_kwargs)
+    else:
+        predictor = TabularPredictor(label=label, **init_kwargs).fit(train_data, **fit_kwargs)
 
     y_pred_proba_og = predictor.predict_proba(test_data)
     y_pred_og = predictor.predict(test_data)
