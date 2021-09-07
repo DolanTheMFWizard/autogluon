@@ -10,6 +10,7 @@ def generate_openml_meta(openml_id: int):
     column_list = data['feature_names']
     num_rows = len(data['target'])
     num_classes = data['target'].nunique()
+    num_missing_rows = len(data['data'].dropna())
     num_unique_nominal_feat = list()
     num_unique_numeric_feat = list()
 
@@ -24,10 +25,10 @@ def generate_openml_meta(openml_id: int):
             num_unique_numeric_feat.append(n_unique)
 
     df_columns = ['id', 'mean unique nominal feat', 'mean unique numeric feat', 'num nominal feat', 'num numeric feat',
-                  'num classes', 'num rows']
+                  'num classes', 'num rows', 'num missing rows']
     df = pd.DataFrame(columns=df_columns)
     df.loc[0] = [openml_id, np.mean(num_unique_nominal_feat), np.mean(num_unique_numeric_feat),
-                 len(num_unique_nominal_feat), len(num_unique_numeric_feat), num_classes, num_rows]
+                 len(num_unique_nominal_feat), len(num_unique_numeric_feat), num_classes, num_rows, num_missing_rows]
     df.to_csv(f'./results/meta/openml{openml_id}_meta.csv', index=False)
 
     # pd.DataFrame.from_dict(dict(id=list(openml_id), mean_unique_nominal_feat=list(np.mean(num_unique_nominal_feat)),
