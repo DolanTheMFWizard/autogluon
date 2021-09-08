@@ -12,7 +12,7 @@ from openml_meta import generate_openml_meta
 
 def fit_pseudo_end_to_end(train_data, test_data, validation_data, label, init_kwargs=None, fit_kwargs=None,
                           max_iter: bool = 1, reuse_pred_test: bool = False, threshold: float = 0.9,
-                          test_only: bool = False):
+                          test_only: bool = False, full_test_data: pd.DataFrame = None):
     if init_kwargs is None:
         init_kwargs = dict()
     if fit_kwargs is None:
@@ -35,7 +35,8 @@ def fit_pseudo_end_to_end(train_data, test_data, validation_data, label, init_kw
                                                       max_iter=max_iter,
                                                       reuse_pred_test=reuse_pred_test,
                                                       threshold=threshold,
-                                                      test_only=test_only)
+                                                      test_only=test_only,
+                                                      full_test_data=full_test_data)
 
     #######
     # score_og = predictor.evaluate_predictions(y_true=test_data[label], y_pred=y_pred_proba_og)
@@ -49,7 +50,8 @@ def fit_pseudo_end_to_end(train_data, test_data, validation_data, label, init_kw
 
 def fit_pseudo_given_preds(train_data, validation_data, test_data, y_pred_proba_og, y_pred_og, problem_type, label,
                            init_kwargs=None,
-                           fit_kwargs=None, max_iter=1, reuse_pred_test: bool = False, threshold: float = .9, test_only: bool = False):
+                           fit_kwargs=None, max_iter=1, reuse_pred_test: bool = False, threshold: float = .9,
+                           test_only: bool = False, full_test_data: pd.DataFrame = None):
     if init_kwargs is None:
         init_kwargs = dict()
     if fit_kwargs is None:
@@ -68,9 +70,13 @@ def fit_pseudo_given_preds(train_data, validation_data, test_data, y_pred_proba_
         test_pseudo_indices[test_pseudo_indices_true.index] = True
 
         # Copy test data and impute labels then select indices that are above threshold
-        test_data_pseudo = test_data.copy()
-        test_data_pseudo[label] = y_pred
-        test_data_pseudo = test_data_pseudo.loc[test_pseudo_indices_true.index]
+
+        if full_test_data is None:
+            test_data_pseudo = test_data.copy()
+            test_data_pseudo[label] = y_pred
+            test_data_pseudo = test_data_pseudo.loc[test_pseudo_indices_true.index]
+        else:
+            test_data_pseudo = full_test_data.loc[test_pseudo_indices_true.index]
 
         if len(test_data_pseudo) > 0:
             if test_only:
@@ -178,8 +184,8 @@ class Metrics:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--openml_id', type=int, help='OpenML id to run on', default=32)
-    parser.add_argument('--best', type=bool, help='Set model to best quality', default=False)
     parser.add_argument('--test_only', type=bool, help='Use test data only during refit', default=False)
+    parser.add_argument('--cheat', type=bool, help='Model should get the true test labels', default=False)
     # parser.add_argument('--id', type=str, help='id given to this runs results', default='no_name')
     # parser.add_argument('--threshold', type=float,
     #                     help='Predictive probability threshold to be above in order to use for pseudo-labeling',
@@ -197,7 +203,6 @@ if __name__ == "__main__":
     val_percent_list = [0.2]
     eval_percent_list = [0.25, 0.5, 0.75, 0.95]
     threshold_list = [0.5, 0.75, 0.9, 0.95]
-    fit_args = dict(presets='best_quality') if args.best else dict()
     max_iter = 1
 
     if max_iter > 1:
@@ -217,39 +222,69 @@ if __name__ == "__main__":
     for vp in val_percent_list:
         for ep in eval_percent_list:
             test_split = df.sample(frac=ep, random_state=1)
+            true_test = list()
             train_split = df.drop(test_split.index)
-            test_data = test_split.drop(columns=label)
             validation_data = train_split.sample(frac=vp, random_state=1)
             train_data = train_split.drop(validation_data.index)
+
+            if args.cheat:
+                true_test = test_split.sample(frac=0.2, random_state=1)
+                test_split = test_split.drop(true_test.index)
+
+            test_data = test_split.drop(columns=label)
+
             train_len = len(train_data)
             test_len = len(test_data)
             val_len = len(validation_data)
+            true_test_len = len(true_test)
 
-            assert (train_len + test_len + val_len) == num_rows
+            assert (train_len + test_len + val_len + true_test_len) == num_rows
             assert not train_data.index.equals(test_data.index)
             assert not test_data.index.equals(validation_data.index)
             assert not train_data.index.equals(validation_data.index)
 
-            agp = TabularPredictor(label=label).fit(train_data=train_data, tuning_data=validation_data, **fit_args)
-            agp_pred = agp.predict(test_data)
+            if args.cheat:
+                assert not train_data.index.equals(true_test.index)
+                assert not test_data.index.equals(true_test.index)
+                assert not validation_data.index.equals(true_test.index)
 
-            vanilla_acc = accuracy_score(agp_pred.to_numpy(), test_split[label].to_numpy())
+            agp = TabularPredictor(label=label).fit(train_data=train_data, tuning_data=validation_data)
+
+            if args.cheat:
+                agp_pred = agp.predict(true_test)
+                vanilla_acc = accuracy_score(agp_pred.to_numpy(), true_test[label].to_numpy())
+            else:
+                agp_pred = agp.predict(test_data)
+                vanilla_acc = accuracy_score(agp_pred.to_numpy(), test_split[label].to_numpy())
+
             score_tracker.add(agp, vanilla_acc, ep)
             for is_reuse in reuse_list:
                 for t in threshold_list:
                     # final_predict, best_model = TabularPredictor(label=label).bad_pseudo_fit(train_data=train_data,
                     #                                                                          test_data=test_data,
                     #                                                                          validation_data=validation_data)
-                    test_pred, best_model = fit_pseudo_end_to_end(train_data=train_data,
-                                                                  validation_data=validation_data,
-                                                                  test_data=test_data, label=label,
-                                                                  max_iter=max_iter,
-                                                                  reuse_pred_test=is_reuse, threshold=t,
-                                                                  fit_kwargs=fit_args, test_only=args.test_only)
-                    final_predict = test_pred.idxmax(axis=1)
-                    pseudo_label_acc = accuracy_score(final_predict.to_numpy(), test_split[label].to_numpy())
+                    if args.cheat:
+                        test_pred, best_model = fit_pseudo_end_to_end(train_data=train_data,
+                                                                      validation_data=validation_data,
+                                                                      test_data=test_data, label=label,
+                                                                      max_iter=max_iter,
+                                                                      reuse_pred_test=is_reuse, threshold=t,
+                                                                      test_only=args.test_only,
+                                                                      full_test_data=test_split)
+                        final_predict = best_model.predict(true_test.drop(columns=label))
+                        pseudo_label_acc = accuracy_score(final_predict.to_numpy(), true_test[label].to_numpy())
+
+                    else:
+                        test_pred, best_model = fit_pseudo_end_to_end(train_data=train_data,
+                                                                      validation_data=validation_data,
+                                                                      test_data=test_data, label=label,
+                                                                      max_iter=max_iter,
+                                                                      reuse_pred_test=is_reuse, threshold=t,
+                                                                      test_only=args.test_only)
+                        final_predict = test_pred.idxmax(axis=1)
+                        pseudo_label_acc = accuracy_score(final_predict.to_numpy(), test_split[label].to_numpy())
+
                     score_tracker.add(best_model, pseudo_label_acc, ep, is_reuse, t)
 
-    bagged_label = '_bagged' if args.best else ''
     test_only_label = '_testonly' if args.test_only else ''
-    score_tracker.generate_csv(f'./results/openml{openml_id}_results_iter{max_iter}{bagged_label}{test_only_label}.csv')
+    score_tracker.generate_csv(f'./results/openml{openml_id}_results_iter{max_iter}{test_only_label}.csv')

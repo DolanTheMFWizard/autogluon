@@ -44,4 +44,9 @@ if __name__ == "__main__":
     parser.add_argument('--openml_id', type=int, help='OpenML id to run on', default=32)
     args = parser.parse_args()
 
+    # datasets = [6, 31, 32, 300, 1169, 1464, 1590, 23512, 40685]
+    #
+    # for key in datasets:
+    #     generate_openml_meta(key)
+
     generate_openml_meta(args.openml_id)

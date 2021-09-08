@@ -1,2 +1,2 @@
-id,mean unique nominal feat,mean unique numeric feat,num nominal feat,num numeric feat,num classes,num rows
-23512.0,,30341.428571428572,0.0,28.0,2.0,98050.0
+id,mean unique nominal feat,mean unique numeric feat,num nominal feat,num numeric feat,num classes,num rows,num missing rows
+23512.0,,30341.428571428572,0.0,28.0,2.0,98050.0,98049.0
