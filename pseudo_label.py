@@ -287,4 +287,5 @@ if __name__ == "__main__":
                     score_tracker.add(best_model, pseudo_label_acc, ep, is_reuse, t)
 
     test_only_label = '_testonly' if args.test_only else ''
-    score_tracker.generate_csv(f'./results/openml{openml_id}_results_iter{max_iter}{test_only_label}.csv')
+    cheat_label = '/cheat' if args.cheat else ''
+    score_tracker.generate_csv(f'./results{cheat_label}/openml{openml_id}_results_iter{max_iter}{test_only_label}.csv')
