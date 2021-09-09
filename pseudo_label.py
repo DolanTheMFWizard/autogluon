@@ -186,6 +186,7 @@ if __name__ == "__main__":
     parser.add_argument('--openml_id', type=int, help='OpenML id to run on', default=32)
     parser.add_argument('--test_only', type=bool, help='Use test data only during refit', default=False)
     parser.add_argument('--cheat', type=bool, help='Model should get the true test labels', default=False)
+    parser.add_argument('--max_iter', type=int, help='Max number of iterations of pseudo-labeling', default=1)
     # parser.add_argument('--id', type=str, help='id given to this runs results', default='no_name')
     # parser.add_argument('--threshold', type=float,
     #                     help='Predictive probability threshold to be above in order to use for pseudo-labeling',
@@ -203,7 +204,7 @@ if __name__ == "__main__":
     val_percent_list = [0.2]
     eval_percent_list = [0.25, 0.5, 0.75, 0.95]
     threshold_list = [0.5, 0.75, 0.9, 0.95]
-    max_iter = 1
+    max_iter = args.max_iter
 
     if max_iter > 1:
         reuse_list = [False]
@@ -258,6 +259,7 @@ if __name__ == "__main__":
                 vanilla_acc = accuracy_score(agp_pred.to_numpy(), test_split[label].to_numpy())
 
             score_tracker.add(agp, vanilla_acc, ep)
+
             for is_reuse in reuse_list:
                 for t in threshold_list:
                     # final_predict, best_model = TabularPredictor(label=label).bad_pseudo_fit(train_data=train_data,
