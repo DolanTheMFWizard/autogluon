@@ -206,7 +206,7 @@ if __name__ == "__main__":
     threshold_list = [0.5, 0.75, 0.9, 0.95]
     max_iter = args.max_iter
 
-    if max_iter > 1:
+    if max_iter < 2:
         reuse_list = [False]
     else:
         reuse_list = [True, False]

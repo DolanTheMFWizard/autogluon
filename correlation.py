@@ -89,7 +89,7 @@ def get_data_across_all_csv(eval_percent: float, threshold: float, is_vanilla: b
         else:
             result = pd.concat([result, new_row])
 
-    fig = plt.figure(figsize=(9,9), dpi=100)
+    fig = plt.figure(figsize=(9, 9), dpi=100)
     ax = fig.add_subplot()
     cax = ax.matshow(result.corr(), interpolation='nearest')
     fig.colorbar(cax)
