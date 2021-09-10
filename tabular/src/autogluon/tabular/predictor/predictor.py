@@ -335,7 +335,7 @@ class TabularPredictor:
             else:
                 break
 
-        return best_model, y_pred
+        return best_model
 
     def filter_pseudo(self, y_pred_proba_og, problem_type, min_percentage: float = 0.05, max_percentage: float = 0.6,
                       threshold: float = 0.9):
