@@ -280,6 +280,7 @@ class TabularPredictor:
             fit_kwargs = dict()
 
         self.fit(train_data, **fit_kwargs)
+        best_model = self
         y_pred_proba_og = self.predict_proba(test_data)
         y_pred_og = self.predict(test_data)
 
