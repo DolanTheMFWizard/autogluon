@@ -286,7 +286,7 @@ class TabularPredictor:
         y_pred = y_pred_og.copy()
         y_pred_proba = y_pred_proba_og.copy()
         y_pred_proba_holdout = y_pred_proba.copy()
-        previous_score = float('-inf')
+        previous_score = self.info()['best_model_score_val']
 
         for i in range(max_iter):
             # Finds pseudo labeling rows that are above threshold
@@ -308,7 +308,7 @@ class TabularPredictor:
                 test_data_holdout = test_data_holdout.loc[test_pseudo_indices[~test_pseudo_indices].index]
                 # predictor_pseudo = TabularPredictor(label=label, **init_kwargs).fit(train_data = train_data, **fit_kwargs)
                 predictor_pseudo = TabularPredictor(label=self.label).fit(train_data=curr_train_data, tuning_data=validation_data, **fit_kwargs)
-                curr_score = self.info()['best_model_score_val']
+                curr_score = predictor_pseudo.info()['best_model_score_val']
 
                 if curr_score > previous_score:
                     previous_score = curr_score
