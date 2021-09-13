@@ -287,6 +287,7 @@ class TabularPredictor:
         y_pred = y_pred_og.copy()
         y_pred_proba = y_pred_proba_og.copy()
         y_pred_proba_holdout = y_pred_proba.copy()
+
         previous_score = self.info()['best_model_score_val']
 
         for i in range(max_iter):
@@ -335,7 +336,7 @@ class TabularPredictor:
             else:
                 break
 
-        return best_model
+        return best_model, y_pred_proba
 
     def filter_pseudo(self, y_pred_proba_og, problem_type, min_percentage: float = 0.05, max_percentage: float = 0.6,
                       threshold: float = 0.9):
