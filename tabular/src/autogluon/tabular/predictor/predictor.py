@@ -300,7 +300,6 @@ class TabularPredictor:
             test_data_pseudo = test_data.copy()
             test_data_pseudo[self.label] = y_pred
             test_data_pseudo = test_data_pseudo.loc[test_pseudo_indices_true.index]
-            best_model = None
 
             if len(test_data_pseudo) > 0:
                 curr_train_data = pd.concat([train_data, test_data_pseudo], ignore_index=True)
