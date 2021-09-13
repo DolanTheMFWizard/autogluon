@@ -38,6 +38,9 @@ def fit_pseudo_end_to_end(train_data, test_data, validation_data, label, init_kw
                                                       test_only=test_only,
                                                       full_test_data=full_test_data)
 
+    if best_model is None:
+        return y_pred_proba_og, predictor
+
     #######
     # score_og = predictor.evaluate_predictions(y_true=test_data[label], y_pred=y_pred_proba_og)
     # score_ps = predictor.evaluate_predictions(y_true=test_data[label], y_pred=y_pred_proba)
