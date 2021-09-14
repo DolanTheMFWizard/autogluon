@@ -274,7 +274,8 @@ class TabularPredictor:
 
     # TODO!!!: This is a hacky way to pseudo-label need to fix
     def bad_pseudo_fit(self, train_data, test_data, validation_data, fit_kwargs=None,
-                       max_iter: bool = 1, reuse_pred_test: bool = False, threshold: float = 0.9, init_kwargs=None):
+                       max_iter: bool = 1, reuse_pred_test: bool = False, threshold: float = 0.9, init_kwargs=None,
+                       force_pseudo: bool = False):
         if fit_kwargs is None:
             fit_kwargs = dict()
 
@@ -290,7 +291,10 @@ class TabularPredictor:
         y_pred_proba = y_pred_proba_og.copy()
         y_pred_proba_holdout = y_pred_proba.copy()
 
-        previous_score = self.info()['best_model_score_val']
+        if force_pseudo:
+            previous_score = float('-inf')
+        else:
+            previous_score = self.info()['best_model_score_val']
 
         for i in range(max_iter):
             # Finds pseudo labeling rows that are above threshold

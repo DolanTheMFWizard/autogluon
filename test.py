@@ -57,29 +57,29 @@ validation_idxes = np.random.choice(train_split.index, int(VAL_P * len(train_spl
 validation_data = train_split.iloc[validation_idxes]
 new_train_data = train_split.iloc[~validation_idxes]
 
+agp = TabularPredictor(label=label).bad_pseudo_fit(train_data=new_train_data, tuning_data=validation_data, test_data=test_split_no_label)
+# test_pred, best_model = fit_pseudo_end_to_end(train_split, test_split_no_label, label)
+# final_predict = test_pred.idxmax(axis=1)
 
-test_pred, best_model = fit_pseudo_end_to_end(train_split, test_split_no_label, label)
-final_predict = test_pred.idxmax(axis=1)
+# agp = TabularPredictor(label=label).fit(train_data=new_train_data, tuning_data=validation_data)
+# agp_pred = agp.predict(test_split_no_label)
 
-agp = TabularPredictor(label=label).fit(train_data=new_train_data, tuning_data=validation_data)
-agp_pred = agp.predict(test_split_no_label)
-
-vanilla_acc = accuracy_score(agp_pred.to_numpy(), test_split[label].to_numpy())
-pseudo_label_acc = accuracy_score(final_predict.to_numpy(), test_split[label].to_numpy())
-
-vanilla_accs.append(vanilla_acc)
-pseudo_accs.append(pseudo_label_acc)
-best_pseudo_model.append(best_model.get_model_best())
-
-df = pd.DataFrame.from_dict(dict(percentage=, vanilla_scores=vanilla_accs, pseudo_scores=pseudo_accs,
-                                 best_pseudo_model=best_pseudo_model))
-label = 'reuse' if IS_REUSE else 'no_reuse'
-
-dir_path = os.path.join(results_path, run_id)
-os.mkdir(dir_path)
-df.to_csv(os.path.join(dir_path, 'results.csv'))
-
-with open(os.path.join(dir_path, 'config.json'), 'w') as outfile:
-    data = vars(args)
-    data['open_ml_id'] = id
-    json.dump(data, outfile)
+# vanilla_acc = accuracy_score(agp_pred.to_numpy(), test_split[label].to_numpy())
+# pseudo_label_acc = accuracy_score(final_predict.to_numpy(), test_split[label].to_numpy())
+#
+# vanilla_accs.append(vanilla_acc)
+# pseudo_accs.append(pseudo_label_acc)
+# best_pseudo_model.append(best_model.get_model_best())
+#
+# df = pd.DataFrame.from_dict(dict(percentage=, vanilla_scores=vanilla_accs, pseudo_scores=pseudo_accs,
+#                                  best_pseudo_model=best_pseudo_model))
+# label = 'reuse' if IS_REUSE else 'no_reuse'
+#
+# dir_path = os.path.join(results_path, run_id)
+# os.mkdir(dir_path)
+# df.to_csv(os.path.join(dir_path, 'results.csv'))
+#
+# with open(os.path.join(dir_path, 'config.json'), 'w') as outfile:
+#     data = vars(args)
+#     data['open_ml_id'] = id
+#     json.dump(data, outfile)
