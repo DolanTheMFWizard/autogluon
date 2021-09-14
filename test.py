@@ -57,7 +57,7 @@ validation_idxes = np.random.choice(train_split.index, int(VAL_P * len(train_spl
 validation_data = train_split.iloc[validation_idxes]
 new_train_data = train_split.iloc[~validation_idxes]
 
-agp = TabularPredictor(label=label).bad_pseudo_fit(train_data=new_train_data, tuning_data=validation_data, test_data=test_split_no_label)
+agp = TabularPredictor(label=label).bad_pseudo_fit(train_data=new_train_data, validation_data=validation_data, test_data=test_split_no_label)
 # test_pred, best_model = fit_pseudo_end_to_end(train_split, test_split_no_label, label)
 # final_predict = test_pred.idxmax(axis=1)
 
