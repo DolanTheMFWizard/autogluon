@@ -280,7 +280,7 @@ class TabularPredictor:
             fit_kwargs = dict()
 
         if init_kwargs is None:
-            init_args = dict()
+            init_kwargs = dict()
 
         self.fit(train_data, **fit_kwargs)
         best_model = self
