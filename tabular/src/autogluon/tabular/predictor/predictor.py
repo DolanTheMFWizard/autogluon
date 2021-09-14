@@ -1,29 +1,28 @@
-import unittest
 import copy
 import logging
-import os
 import math
+import os
 import pprint
 import time
+import unittest
 from typing import Union
 
+import networkx as nx
 import numpy as np
 import pandas as pd
-import networkx as nx
-
+from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT
 from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.dataset import TabularDataset
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
-from autogluon.core.constants import BINARY, MULTICLASS, REGRESSION, QUANTILE, AUTO_WEIGHT, BALANCE_WEIGHT
-from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models
 from autogluon.core.utils import get_pred_from_proba_df, set_logger_verbosity
+from autogluon.core.utils import plot_performance_vs_trials, plot_summary_of_models, plot_tabular_models
+from autogluon.core.utils.decorators import apply_presets
 from autogluon.core.utils.loaders import load_pkl
 from autogluon.core.utils.savers import save_pkl
 from autogluon.core.utils.utils import setup_outputdir, default_holdout_frac, get_approximate_df_mem_usage
-from autogluon.core.utils.decorators import apply_presets
 
-from ..configs.hyperparameter_configs import get_hyperparameter_config
 from ..configs.feature_generator_presets import get_default_feature_generator
+from ..configs.hyperparameter_configs import get_hyperparameter_config
 from ..configs.presets_configs import tabular_presets_dict
 from ..learner import AbstractLearner, DefaultLearner
 from ..trainer import AbstractTrainer
@@ -275,9 +274,12 @@ class TabularPredictor:
 
     # TODO!!!: This is a hacky way to pseudo-label need to fix
     def bad_pseudo_fit(self, train_data, test_data, validation_data, fit_kwargs=None,
-                       max_iter: bool = 1, reuse_pred_test: bool = False, threshold: float = 0.9):
+                       max_iter: bool = 1, reuse_pred_test: bool = False, threshold: float = 0.9, init_kwargs=None):
         if fit_kwargs is None:
             fit_kwargs = dict()
+
+        if init_kwargs is None:
+            init_args = dict()
 
         self.fit(train_data, **fit_kwargs)
         best_model = self
@@ -293,7 +295,7 @@ class TabularPredictor:
         for i in range(max_iter):
             # Finds pseudo labeling rows that are above threshold
             test_pseudo_indices_true = self.filter_pseudo(y_pred_proba_holdout, problem_type=self.problem_type,
-                                                     threshold=threshold)
+                                                          threshold=threshold)
             test_pseudo_indices = pd.Series(data=False, index=y_pred_proba_holdout.index)
             test_pseudo_indices[test_pseudo_indices_true.index] = True
 
@@ -308,7 +310,9 @@ class TabularPredictor:
                 test_data_holdout = test_data.copy()
                 test_data_holdout = test_data_holdout.loc[test_pseudo_indices[~test_pseudo_indices].index]
                 # predictor_pseudo = TabularPredictor(label=label, **init_kwargs).fit(train_data = train_data, **fit_kwargs)
-                predictor_pseudo = TabularPredictor(label=self.label).fit(train_data=curr_train_data, tuning_data=validation_data, **fit_kwargs)
+                predictor_pseudo = TabularPredictor(label=self.label, **init_kwargs).fit(train_data=curr_train_data,
+                                                                                         tuning_data=validation_data,
+                                                                                         **fit_kwargs)
                 curr_score = predictor_pseudo.info()['best_model_score_val']
 
                 if curr_score > previous_score:

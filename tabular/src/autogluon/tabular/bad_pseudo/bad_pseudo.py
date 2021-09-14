@@ -13,13 +13,11 @@ def fit_pseudo_end_to_end(train_data, test_data, validation_data, label, init_kw
     if fit_kwargs is None:
         fit_kwargs = dict()
 
-    if 'pseudo' not in fit_kwargs:
-        return TabularPredictor(label=label, **init_kwargs).fit(train_data, **fit_kwargs)
-    else:
-        predictor = TabularPredictor(label=label, **init_kwargs).fit(train_data, **fit_kwargs)
+    predictor = TabularPredictor(label=label, **init_kwargs).fit(train_data, **fit_kwargs)
 
     y_pred_proba_og = predictor.predict_proba(test_data)
     y_pred_og = predictor.predict(test_data)
+    vanilla_score = predictor.info()['best_model_score_val']
 
     # y_pred_proba, best_model, total_iter
     best_model = fit_pseudo_given_preds(train_data=train_data,
@@ -106,7 +104,7 @@ def fit_pseudo_given_preds(train_data, validation_data, test_data, y_pred_proba_
         else:
             break
 
-    return best_model
+    return best_model, y_pred_proba_holdout
 
 
 def filter_pseudo(y_pred_proba_og, problem_type, min_percentage: float = 0.05, max_percentage: float = 0.6,
