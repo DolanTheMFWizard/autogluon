@@ -275,7 +275,7 @@ class TabularPredictor:
     # TODO!!!: This is a hacky way to pseudo-label need to fix
     def bad_pseudo_fit(self, train_data, test_data, validation_data, fit_kwargs=None,
                        max_iter: bool = 1, reuse_pred_test: bool = False, threshold: float = 0.9, init_kwargs=None,
-                       force_pseudo: bool = False):
+                       force_pseudo: bool = False, use_ECE: bool = False):
         if fit_kwargs is None:
             fit_kwargs = dict()
 
@@ -298,10 +298,16 @@ class TabularPredictor:
 
         for i in range(max_iter):
             # Finds pseudo labeling rows that are above threshold
-            test_pseudo_indices_true = self.filter_pseudo(y_pred_proba_holdout, problem_type=self.problem_type,
+            if use_ECE and self.problem_type in ['binary', 'multiclass']:
+                test_pseudo_indices = self. ECE_filter_pseudo(best_model, validation_data=validation_data, holdout_proba=y_pred_proba_holdout, threshold=threshold)
+                test_pseudo_indices = pd.Series(data=test_pseudo_indices, index=y_pred_proba_holdout.index)
+                test_pseudo_indices_true = test_pseudo_indices[test_pseudo_indices == True]
+            else:
+                test_pseudo_indices_true = self.filter_pseudo(y_pred_proba_holdout, problem_type=self.problem_type,
                                                           threshold=threshold)
-            test_pseudo_indices = pd.Series(data=False, index=y_pred_proba_holdout.index)
-            test_pseudo_indices[test_pseudo_indices_true.index] = True
+                test_pseudo_indices = pd.Series(data=False, index=y_pred_proba_holdout.index)
+                test_pseudo_indices[test_pseudo_indices_true.index] = True
+            
 
             # Copy test data and impute labels then select indices that are above threshold
             test_data_pseudo = test_data.copy()
@@ -345,6 +351,39 @@ class TabularPredictor:
                 break
 
         return best_model, y_pred_proba
+    
+    def ECE_filter_pseudo(self, model, validation_data: pd.DataFrame, holdout_proba: pd.DataFrame, threshold: float = 0.9):
+        y_validation_pred_proba = model.predict_proba(validation_data)
+        predictions = y_validation_pred_proba.idxmax(axis=1)
+        prediction_probs = y_validation_pred_proba.max(axis=1)
+        holdout_predicts = holdout_proba.idxmax(axis=1)
+        holdout_max_probs = holdout_proba.max(axis=1)
+        val_labels = validation_data[self.label]
+        classes = predictions.unique()
+        pseudo_indexes = None
+
+        for c in classes:
+            predicted_as_c_idxes = predictions[predictions == c].index
+            predicted_c_probs = prediction_probs.loc[predicted_as_c_idxes]
+            val_labels_as_c = val_labels.loc[predicted_as_c_idxes]
+            
+            accuracy = len(val_labels_as_c[val_labels_as_c == c])/len(val_labels_as_c)
+            confidence = np.mean(predicted_c_probs.to_numpy())
+            calibration = accuracy - confidence
+
+            class_threshold = threshold - calibration
+            
+            holdout_as_c_idxes = holdout_predicts[holdout_predicts == c].index
+            holdout_c_probs = holdout_max_probs.loc[holdout_as_c_idxes]
+
+            if c == classes[0]:
+                pseudo_indexes = (holdout_c_probs >= class_threshold)
+            else:
+                pseudo_indexes = pseudo_indexes.append((holdout_c_probs >= class_threshold), verify_integrity=True)
+        
+        assert (len(pseudo_indexes) == len(holdout_proba))
+        return pseudo_indexes
+        
 
     def filter_pseudo(self, y_pred_proba_og, problem_type, min_percentage: float = 0.05, max_percentage: float = 0.6,
                       threshold: float = 0.9):
