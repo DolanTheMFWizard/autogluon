@@ -491,12 +491,49 @@ def customized_log_loss(y_true, y_pred, eps=1e-15):
                                         labels=labels,
                                         eps=eps)
 
+def customized_neg_log_loss(y_true, y_pred, eps=1e-15):
+    """
+
+    Parameters
+    ----------
+    y_true : array-like or label indicator matrix
+        Ground truth (correct) labels for n_samples samples.
+
+    y_pred : array-like of float
+        The predictions. shape = (n_samples, n_classes) or (n_samples,)
+
+    eps : float
+        The epsilon
+
+    Returns
+    -------
+    loss
+        The negative log-likelihood
+    """
+    assert y_true.ndim == 1
+    if y_pred.ndim == 1:
+        # First clip the y_pred which is also used in sklearn
+        y_pred = np.clip(y_pred, eps, 1 - eps)
+        return -1 * (- (y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred)).mean())
+    else:
+        assert y_pred.ndim == 2, 'Only ndim=2 is supported'
+        labels = np.arange(y_pred.shape[1], dtype=np.int32)
+        return -1 * sklearn.metrics.log_loss(y_true.astype(np.int32), y_pred,
+                                        labels=labels,
+                                        eps=eps)
+
 
 # Score function for probabilistic classification
 log_loss = make_scorer('log_loss',
                        customized_log_loss,
                        optimum=0,
                        greater_is_better=False,
+                       needs_proba=True)
+
+neg_log_loss = make_scorer('neg_log_loss',
+                       customized_neg_log_loss,
+                       optimum=0,
+                       greater_is_better=True,
                        needs_proba=True)
 log_loss.add_alias('nll')
 
