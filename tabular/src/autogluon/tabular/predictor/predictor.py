@@ -362,7 +362,7 @@ class TabularPredictor:
         holdout_max_probs = holdout_proba.max(axis=1)
         val_labels = validation_data[self.label]
         classes = predictions.unique()
-        pseudo_indexes = None
+        pseudo_indexes = pd.Series(data=False, index=holdout_proba.index)
 
         for c in classes:
             predicted_as_c_idxes = predictions[predictions == c].index
@@ -378,12 +378,8 @@ class TabularPredictor:
             holdout_as_c_idxes = holdout_predicts[holdout_predicts == c].index
             holdout_c_probs = holdout_max_probs.loc[holdout_as_c_idxes]
 
-            if c == classes[0]:
-                pseudo_indexes = (holdout_c_probs >= class_threshold)
-            else:
-                pseudo_indexes = pseudo_indexes.append((holdout_c_probs >= class_threshold), verify_integrity=True)
+            pseudo_indexes.loc[(holdout_c_probs >= class_threshold).index] = True
 
-        assert (len(pseudo_indexes) == len(holdout_proba))
         return pseudo_indexes
 
     def filter_pseudo(self, y_pred_proba_og, problem_type, min_percentage: float = 0.05, max_percentage: float = 0.6,
