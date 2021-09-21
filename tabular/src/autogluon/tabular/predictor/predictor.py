@@ -299,10 +299,11 @@ class TabularPredictor:
         for i in range(max_iter):
             # Finds pseudo labeling rows that are above threshold
             if use_ECE and self.problem_type in ['binary', 'multiclass']:
-                test_pseudo_indices = self.ECE_filter_pseudo(best_model, validation_data=validation_data,
-                                                             holdout_proba=y_pred_proba_holdout, threshold=threshold)
-                test_pseudo_indices = pd.Series(data=test_pseudo_indices, index=y_pred_proba_holdout.index)
-                test_pseudo_indices_true = test_pseudo_indices[test_pseudo_indices == True]
+                test_pseudo_indices_true = self.ECE_filter_pseudo(best_model, validation_data=validation_data,
+                                                                  holdout_proba=y_pred_proba_holdout,
+                                                                  threshold=threshold)
+                test_pseudo_indices = pd.Series(data=False, index=y_pred_proba_holdout.index)
+                test_pseudo_indices[test_pseudo_indices_true.index] = True
             else:
                 test_pseudo_indices_true = self.filter_pseudo(y_pred_proba_holdout, problem_type=self.problem_type,
                                                               threshold=threshold)
