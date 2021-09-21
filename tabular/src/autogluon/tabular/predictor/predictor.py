@@ -380,7 +380,7 @@ class TabularPredictor:
 
             pseudo_indexes.loc[(holdout_c_probs >= class_threshold).index] = True
 
-        return pseudo_indexes
+        return pseudo_indexes[pseudo_indexes==True]
 
     def filter_pseudo(self, y_pred_proba_og, problem_type, min_percentage: float = 0.05, max_percentage: float = 0.6,
                       threshold: float = 0.9):
