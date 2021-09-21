@@ -37,10 +37,13 @@ class SequentialLocalFoldFittingStrategy(AbstractFoldFittingStrategy):
     This strategy fits the folds locally in a sequence.
     """
 
-    def __init__(self, bagged_ensemble_model, X: DataFrame, y: Series, sample_weight, time_limit: float, time_start: float,
+    def __init__(self, bagged_ensemble_model, X: DataFrame, y: Series, X_pseudo: DataFrame, y_pseudo: Series,
+                 sample_weight, time_limit: float, time_start: float,
                  models: list, oof_pred_proba: ndarray, oof_pred_model_repeats: ndarray, save_folds: bool):
         self.X = X
         self.y = y
+        self.X_pseudo = X_pseudo
+        self.y_pseudo = y_pseudo
         self.sample_weight = sample_weight
         self.time_limit = time_limit
         self.time_start = time_start
@@ -97,24 +100,41 @@ class SequentialLocalFoldFittingStrategy(AbstractFoldFittingStrategy):
         self.bagged_ensemble_model._add_child_times_to_bag(model=fold_model)
 
     def _fit(self, model_base, time_start_fold, time_limit_fold, fold_ctx, kwargs):
-        fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix = self._get_fold_properties(fold_ctx)
+        fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix = self._get_fold_properties(
+            fold_ctx)
         train_index, val_index = fold
         X_fold, X_val_fold = self.X.iloc[train_index, :], self.X.iloc[val_index, :]
         y_fold, y_val_fold = self.y.iloc[train_index], self.y.iloc[val_index]
+
         fold_model = copy.deepcopy(model_base)
         fold_model.name = f'{fold_model.name}{model_name_suffix}'
         fold_model.set_contexts(self.bagged_ensemble_model.path + fold_model.name + os.path.sep)
         kwargs_fold = kwargs.copy()
+        is_pseudo = self.X_pseudo is not None and self.y_pseudo is not None
+
         if self.sample_weight is not None:
-            kwargs_fold['sample_weight'] = self.sample_weight[train_index]
-            kwargs_fold['sample_weight_val'] = self.sample_weight[val_index]
-        fold_model.fit(X=X_fold, y=y_fold, X_val=X_val_fold, y_val=y_val_fold, time_limit=time_limit_fold, **kwargs_fold)
+            if is_pseudo:
+                # TODO: Add support for sample_weight when pseudo is present
+                logger.warning('WARNING: Sample weights given, but not used due to pseudo labelled data being given.')
+            else:
+                kwargs_fold['sample_weight'] = self.sample_weight[train_index]
+                kwargs_fold['sample_weight_val'] = self.sample_weight[val_index]
+
+        if is_pseudo:
+            import pandas as pd
+            logger.log(20, f'Pseudo labeling incorporated for {fold_model.name}, with {len(X_fold)} rows of Pseudo')
+            X_fold = pd.concat([X_fold, self.X_pseudo], axis=0, ignore_index=True)
+            y_fold = pd.concat([y_fold, self.y_pseudo], axis=0, ignore_index=True)
+
+        fold_model.fit(X=X_fold, y=y_fold, X_val=X_val_fold, y_val=y_val_fold, time_limit=time_limit_fold,
+                       **kwargs_fold)
         fold_model.fit_time = time.time() - time_start_fold
         return fold_model
 
     def _predict_oof(self, fold_model, fold_ctx):
         time_train_end_fold = time.time()
-        fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix = self._get_fold_properties(fold_ctx)
+        fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix = self._get_fold_properties(
+            fold_ctx)
         _, val_index = fold
         X_val_fold = self.X.iloc[val_index, :]
         y_val_fold = self.y.iloc[val_index]
@@ -137,6 +157,7 @@ class SequentialLocalFoldFittingStrategy(AbstractFoldFittingStrategy):
     @staticmethod
     def _get_fold_properties(fold_ctx):
         fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix = [
-            fold_ctx[f] for f in ['fold', 'folds_finished', 'folds_left', 'folds_to_fit', 'is_last_fold', 'model_name_suffix']
+            fold_ctx[f] for f in
+            ['fold', 'folds_finished', 'folds_left', 'folds_to_fit', 'is_last_fold', 'model_name_suffix']
         ]
         return fold, folds_finished, folds_left, folds_to_fit, is_last_fold, model_name_suffix
