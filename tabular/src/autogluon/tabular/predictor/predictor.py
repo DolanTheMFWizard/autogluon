@@ -373,7 +373,7 @@ class TabularPredictor:
             confidence = np.mean(predicted_c_probs.to_numpy())
             calibration = accuracy - confidence
 
-            class_threshold = threshold - calibration
+            class_threshold = threshold - (0.5 * calibration)
 
             holdout_as_c_idxes = holdout_predicts[holdout_predicts == c].index
             holdout_c_probs = holdout_max_probs.loc[holdout_as_c_idxes]
