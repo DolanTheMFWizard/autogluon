@@ -273,4 +273,4 @@ if __name__ == "__main__":
 
     for id in benchmark:
         run(openml_id=id, threshold=0.95, max_iter=5, openml_metrics=openml_metrics)
-    openml_metrics.generate_csv('./results.csv')
+        openml_metrics.generate_csv('./results.csv')
