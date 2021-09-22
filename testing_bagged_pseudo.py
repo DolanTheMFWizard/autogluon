@@ -222,8 +222,9 @@ def run(openml_id: int, threshold: float, max_iter: int, openml_metrics: OpenML_
             model_pseudo.fit(X=X_clean, y=y_clean, X_pseudo=X_pseudo, y_pseudo=y_pseudo,
                              k_fold=10)  # Perform 10-fold bagging
 
-            X_test_clean = X_test_clean.loc[test_pseudo_idxes[test_pseudo_idxes == False].index]
-            y_test_clean = y_test_clean.loc[test_pseudo_idxes[test_pseudo_idxes == False].index]
+            test_not_pseudo_idxes = test_pseudo_idxes[test_pseudo_idxes == False].index
+            X_test_clean = X_test_clean.loc[test_not_pseudo_idxes]
+            y_test_clean = y_test_clean.loc[test_not_pseudo_idxes]
 
             assert X_test_clean.index.identical(y_test_clean.index)
             assert not (test_pseudo_idxes_true.index.isin(X_test_clean.index)).any()
@@ -238,7 +239,6 @@ def run(openml_id: int, threshold: float, max_iter: int, openml_metrics: OpenML_
             assert y_test_clean_og.index.identical(y_pred.index)
 
             if i > 0:
-                # assert not y_pred.equals(y_pred_vanilla_series)
                 assert not y_pred_proba.equals(y_pred_proba_vanilla)
 
             curr_score = get_bagged_model_val_score_avg(model_pseudo)
@@ -255,7 +255,7 @@ def run(openml_id: int, threshold: float, max_iter: int, openml_metrics: OpenML_
         else:
             break
 
-    openml_metrics.add(model_name='Pseudo Label', eval_p=val_score_vanilla, openml_id=openml_id,
+    openml_metrics.add(model_name='Pseudo Label', eval_p=previous_val_score, openml_id=openml_id,
                        accuracy=acc, auc=auc, neg_logloss=neg_logloss, MAE=mae, neg_MSE=neg_mse, result=result,
                        iter=i, metric=eval_metric.name, threshold=threshold,
                        model_score=best_model.score(X_test_clean_og, y_test_clean_og))
