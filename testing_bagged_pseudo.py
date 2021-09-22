@@ -218,7 +218,7 @@ def run(openml_id: int, threshold: float, max_iter: int, openml_metrics: OpenML_
 
         assert X_test_clean.index.identical(test_pseudo_idxes.index)
 
-        if len(test_pseudo_idxes_true) > 0:
+        if len(test_pseudo_idxes_true) > 0 and not test_pseudo_idxes_true.index.equals(y_test_pred_proba_df.index):
             X_pseudo = X_test_clean.loc[test_pseudo_idxes_true.index]
             y_pseudo = y_pred.loc[test_pseudo_idxes_true.index]
 
@@ -227,6 +227,9 @@ def run(openml_id: int, threshold: float, max_iter: int, openml_metrics: OpenML_
                              k_fold=10)  # Perform 10-fold bagging
 
             test_not_pseudo_idxes = test_pseudo_idxes[test_pseudo_idxes == False].index
+
+            assert not test_not_pseudo_idxes.isin(test_pseudo_idxes_true.index).any()
+
             X_test_clean = X_test_clean.loc[test_not_pseudo_idxes]
             y_test_clean = y_test_clean.loc[test_not_pseudo_idxes]
 
