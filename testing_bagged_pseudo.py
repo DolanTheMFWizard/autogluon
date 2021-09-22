@@ -151,7 +151,11 @@ def get_metric(problem_type):
 
 
 def run(openml_id: int, threshold: float, max_iter: int, openml_metrics: OpenML_Metrics):
-    data = fetch_openml(data_id=openml_id, as_frame=True)
+    try:
+        data = fetch_openml(data_id=openml_id, as_frame=True)
+    except Exception as e:
+        return
+
     features = data['data']
     target = data['target']
     label = data['target_names'][0]
