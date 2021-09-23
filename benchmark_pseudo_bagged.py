@@ -341,7 +341,7 @@ def run_pseudo_label(best_model: BaggedEnsembleModel,
                         model_score=best_model.score(X_test_clean_og, y_test_clean_og))
 
 
-def run(openml_id: int, threshold: float, max_iter: int, openml_metrics: Open_ML_Metrics):
+def run(openml_id: int, threshold: float, max_iter: int, open_ml_metrics: Open_ML_Metrics):
     try:
         data = fetch_openml(data_id=openml_id, as_frame=True)
     except Exception as e:
@@ -392,38 +392,32 @@ def run(openml_id: int, threshold: float, max_iter: int, openml_metrics: Open_ML
                                                                   problem_type=problem_type)
 
     if problem_type in CLASSIFICATION:
-        # run_pseudo_label(best_model=model_vanilla, X_clean=X_clean.copy(), y_clean=y_clean.copy(),
-        #                  X_test_clean=X_test_clean.copy(), y_test_clean=y_test_clean.copy(),
-        #                  previous_val_score=val_score_vanilla, y_pred=y_pred_vanilla_series.copy(),
-        #                  y_pred_proba=y_test_pred_proba_df.copy(), max_iter=max_iter, use_ECE=True,
-        #                  problem_type=problem_type, label_cleaner=label_cleaner, threshold=threshold,
-        #                  eval_metric=eval_metric, open_ml_id=openml_id, open_ml_metrics=openml_metrics,
-        #                  use_Jonas=True)
-        run_pseudo_label(best_model=model_vanilla, X_clean=X_clean.copy(), y_clean=y_clean.copy(),
-                         X_test_clean=X_test_clean.copy(), y_test_clean=y_test_clean.copy(),
-                         previous_val_score=val_score_vanilla, y_pred=y_pred_vanilla_series.copy(),
-                         y_pred_proba=y_test_pred_proba_df.copy(), max_iter=max_iter, use_ECE=False,
-                         problem_type=problem_type, label_cleaner=label_cleaner, threshold=threshold,
-                         eval_metric=eval_metric, open_ml_id=openml_id, open_ml_metrics=openml_metrics,
-                         use_Jonas=False)
-
         run_pseudo_label(best_model=model_vanilla, X_clean=X_clean.copy(), y_clean=y_clean.copy(),
                          X_test_clean=X_test_clean.copy(), y_test_clean=y_test_clean.copy(),
                          previous_val_score=val_score_vanilla, y_pred=y_pred_vanilla_series.copy(),
                          y_pred_proba=y_test_pred_proba_df.copy(), max_iter=max_iter, use_ECE=True,
                          problem_type=problem_type, label_cleaner=label_cleaner, threshold=threshold,
-                         eval_metric=eval_metric, open_ml_id=openml_id, open_ml_metrics=openml_metrics,
+                         eval_metric=eval_metric, open_ml_id=openml_id, open_ml_metrics=open_ml_metrics,
                          use_Jonas=False)
+
+    run_pseudo_label(best_model=model_vanilla, X_clean=X_clean.copy(), y_clean=y_clean.copy(),
+                     X_test_clean=X_test_clean.copy(), y_test_clean=y_test_clean.copy(),
+                     previous_val_score=val_score_vanilla, y_pred=y_pred_vanilla_series.copy(),
+                     y_pred_proba=y_test_pred_proba_df.copy(), max_iter=max_iter, use_ECE=False,
+                     problem_type=problem_type, label_cleaner=label_cleaner, threshold=threshold,
+                     eval_metric=eval_metric, open_ml_id=openml_id, open_ml_metrics=open_ml_metrics,
+                     use_Jonas=False)
 
     result, auc, neg_log_loss, acc, mae, neg_mse = get_test_score(y_test_clean=y_test_clean,
                                                                   y_pred=y_pred_vanilla_series,
                                                                   y_pred_proba=y_test_pred_proba_df,
                                                                   problem_type=problem_type)
 
-    openml_metrics.add(model_name='Vanilla', eval_p=val_score_vanilla, openml_id=openml_id,
-                       accuracy=acc, auc=auc, neg_logloss=neg_log_loss, MAE=mae, neg_MSE=neg_mse, result=result, iter=0,
-                       metric=eval_metric.name, model_score=model_vanilla.score(X_test_clean, y_test_clean),
-                       problem_type=problem_type)
+    open_ml_metrics.add(model_name='Vanilla', eval_p=val_score_vanilla, openml_id=openml_id,
+                        accuracy=acc, auc=auc, neg_logloss=neg_log_loss, MAE=mae, neg_MSE=neg_mse, result=result,
+                        iter=0,
+                        metric=eval_metric.name, model_score=model_vanilla.score(X_test_clean, y_test_clean),
+                        problem_type=problem_type)
 
 
 if __name__ == "__main__":
@@ -438,8 +432,9 @@ if __name__ == "__main__":
                  41150, 1489, 41142, 3, 12, 31, 1067, 54, 1590]
     openml_metrics = Open_ML_Metrics()
 
-    # run(openml_id=31, threshold=args.threshold, max_iter=5, openml_metrics=openml_metrics)
-
     for id in benchmark:
-        run(openml_id=id, threshold=args.threshold, max_iter=5, openml_metrics=openml_metrics)
-        openml_metrics.generate_csv(args.save_path)
+        try:
+            run(openml_id=id, threshold=args.threshold, max_iter=5, open_ml_metrics=openml_metrics)
+            openml_metrics.generate_csv(args.save_path)
+        except Exception as e:
+            continue
