@@ -186,7 +186,7 @@ def ECE_filter_pseudo(y_pred_proba: pd.DataFrame, val_pred_proba: pd.DataFrame, 
 
 
 def ECE_filter_pseudo(y_pred_proba: pd.DataFrame, val_pred_proba: pd.DataFrame, val_label: pd.Series, threshold: float,
-                      anneal_frac: float = 0.5):
+                      anneal_frac: float = 0.25):
     predictions = val_pred_proba.idxmax(axis=1)
     prediction_probs = val_pred_proba.max(axis=1)
     y_predicts = y_pred_proba.idxmax(axis=1)
@@ -215,7 +215,7 @@ def ECE_filter_pseudo(y_pred_proba: pd.DataFrame, val_pred_proba: pd.DataFrame, 
 
 
 def scale_ece_filter(y_pred_proba: pd.DataFrame, val_pred_proba: pd.DataFrame, val_label: pd.Series,
-                     threshold: float):
+                     threshold: float, anneal_frac: float = 0.25):
     predictions = val_pred_proba.idxmax(axis=1)
     prediction_probs = val_pred_proba.max(axis=1)
     y_predicts = y_pred_proba.idxmax(axis=1)
@@ -235,7 +235,7 @@ def scale_ece_filter(y_pred_proba: pd.DataFrame, val_pred_proba: pd.DataFrame, v
         confidence = np.mean(predicted_c_probs.to_numpy())
         calibration = accuracy - confidence
 
-        class_threshold = threshold - (0.5 * calibration)
+        class_threshold = threshold - (anneal_frac * calibration)
 
         holdout_as_c_idxes = y_predicts[y_predicts == c].index
         holdout_c_probs = y_max_probs.loc[holdout_as_c_idxes]
