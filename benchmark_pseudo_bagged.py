@@ -257,6 +257,7 @@ def run_pseudo_label(best_model: BaggedEnsembleModel,
                      open_ml_metrics: Open_ML_Metrics, use_Jonas: bool):
     X_test_clean_og = X_test_clean.copy()
     y_test_clean_og = y_test_clean.copy()
+    y_pred_og = y_pred.copy()
     y_pred_proba_og = y_pred_proba.copy()
 
     result, auc, neg_log_loss, acc, mae, neg_mse = get_test_score(y_test_clean=y_test_clean_og,
@@ -288,46 +289,41 @@ def run_pseudo_label(best_model: BaggedEnsembleModel,
 
         test_pseudo_idxes = pd.Series(data=False, index=y_pred_proba.index)
         test_pseudo_idxes.loc[test_pseudo_idxes_true.index] = True
-        y_pred_proba.loc[test_pseudo_idxes_true.index] = y_pred_proba.loc[test_pseudo_idxes_true.index]
 
-        assert X_test_clean.index.identical(test_pseudo_idxes.index)
+        if len(test_pseudo_idxes_true) > 0 and len(y_pred_proba) > len(test_pseudo_idxes_true):
+            X_new_pseudo = X_test_clean.loc[test_pseudo_idxes_true.index]
+            y_new_pseudo = y_pred.loc[test_pseudo_idxes_true.index]
 
-        if len(test_pseudo_idxes_true) > 0 and not test_pseudo_idxes_true.index.equals(y_pred_proba.index):
-            X_pseudo = X_test_clean.loc[test_pseudo_idxes_true.index]
-            y_pseudo = y_pred.loc[test_pseudo_idxes_true.index]
+            if i == 0:
+                X_pseudo = X_new_pseudo
+                y_pseudo = y_new_pseudo
+            else:
+                X_pseudo = X_pseudo.append(X_new_pseudo, verify_integrity=True)
+                y_pseudo = y_pseudo.append(y_new_pseudo, verify_integrity=True)
+
+            y_pred_og.loc[test_pseudo_idxes_true.index] = y_pred.loc[test_pseudo_idxes_true.index]
+            y_pred_proba_og.loc[test_pseudo_idxes_true.index] = y_pred_proba.loc[test_pseudo_idxes_true.index]
+
+            test_not_pseudo_idxes = test_pseudo_idxes[test_pseudo_idxes == False].index
+            X_test_clean = X_test_clean.loc[test_not_pseudo_idxes]
+            y_test_clean = y_test_clean.loc[test_not_pseudo_idxes]
 
             model_pseudo = BaggedEnsembleModel(LGBModel(eval_metric=eval_metric))
             model_pseudo.fit(X=X_clean, y=y_clean, X_pseudo=X_pseudo, y_pseudo=y_pseudo,
                              k_fold=10)  # Perform 10-fold bagging
 
-            test_not_pseudo_idxes = test_pseudo_idxes[test_pseudo_idxes == False].index
-
-            assert not test_not_pseudo_idxes.isin(test_pseudo_idxes_true.index).any()
-
-            X_test_clean = X_test_clean.loc[test_not_pseudo_idxes]
-            y_test_clean = y_test_clean.loc[test_not_pseudo_idxes]
-
-            assert X_test_clean.index.identical(y_test_clean.index)
-            assert not (test_pseudo_idxes_true.index.isin(X_test_clean.index)).any()
-
-            y_pred.loc[test_pseudo_idxes_true.index] = y_pseudo
-
             y_pred_proba_np = model_pseudo.predict_proba(X_test_clean)
             y_pred_proba = convert_np_pred_prob(y_pred_proba=y_pred_proba_np, label_cleaner=label_cleaner,
                                                 problem_type=problem_type, y=y_test_clean)
-
-            assert y_test_clean_og.index.identical(y_pred.index)
-
-            if i > 0:
-                assert not y_pred_proba.equals(y_pred_proba_og)
+            y_pred = pd.Series(model_pseudo.predict(X_test_clean), name=y_test_clean.name, index=X_test_clean.index)
 
             curr_score = get_bagged_model_val_score_avg(model_pseudo)
 
             if curr_score > previous_val_score:
                 previous_val_score = curr_score
                 result, auc, neg_log_loss, acc, mae, neg_mse = get_test_score(y_test_clean=y_test_clean_og,
-                                                                              y_pred=y_pred,
-                                                                              y_pred_proba=y_pred_proba,
+                                                                              y_pred=y_pred_og,
+                                                                              y_pred_proba=y_pred_proba_og,
                                                                               problem_type=problem_type)
                 best_model = model_pseudo
             else:
@@ -347,7 +343,7 @@ def run(openml_id: int, threshold: float, max_iter: int, openml_metrics: Open_ML
     try:
         data = fetch_openml(data_id=openml_id, as_frame=True)
     except Exception as e:
-        return
+        return None
 
     features = data['data']
     target = data['target']
@@ -395,7 +391,8 @@ def run(openml_id: int, threshold: float, max_iter: int, openml_metrics: Open_ML
 
     openml_metrics.add(model_name='Vanilla', eval_p=val_score_vanilla, openml_id=openml_id,
                        accuracy=acc, auc=auc, neg_logloss=neg_log_loss, MAE=mae, neg_MSE=neg_mse, result=result, iter=0,
-                       metric=eval_metric.name, model_score=model_vanilla.score(X_test_clean, y_test_clean), problem_type=problem_type)
+                       metric=eval_metric.name, model_score=model_vanilla.score(X_test_clean, y_test_clean),
+                       problem_type=problem_type)
 
     if problem_type in CLASSIFICATION:
         # run_pseudo_label(best_model=model_vanilla, X_clean=X_clean.copy(), y_clean=y_clean.copy(),
@@ -420,6 +417,16 @@ def run(openml_id: int, threshold: float, max_iter: int, openml_metrics: Open_ML
                          problem_type=problem_type, label_cleaner=label_cleaner, threshold=threshold,
                          eval_metric=eval_metric, open_ml_id=openml_id, open_ml_metrics=openml_metrics,
                          use_Jonas=False)
+
+    result, auc, neg_log_loss, acc, mae, neg_mse = get_test_score(y_test_clean=y_test_clean,
+                                                                  y_pred=y_pred_vanilla_series,
+                                                                  y_pred_proba=y_test_pred_proba_df,
+                                                                  problem_type=problem_type)
+
+    openml_metrics.add(model_name='Vanilla', eval_p=val_score_vanilla, openml_id=openml_id,
+                       accuracy=acc, auc=auc, neg_logloss=neg_log_loss, MAE=mae, neg_MSE=neg_mse, result=result, iter=0,
+                       metric=eval_metric.name, model_score=model_vanilla.score(X_test_clean, y_test_clean),
+                       problem_type=problem_type)
 
 
 if __name__ == "__main__":
