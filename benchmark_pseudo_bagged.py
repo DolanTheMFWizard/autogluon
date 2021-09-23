@@ -363,7 +363,7 @@ def run(openml_id: int, threshold: float, max_iter: int, openml_metrics: Open_ML
                                                                                            test_data=test_data,
                                                                                            label=label)
 
-    if problem_type not in CLASSIFICATION:
+    if problem_type not in CLASSIFICATION or len(features) > 20000:
         return None
 
     eval_metric = get_metric(problem_type=problem_type)
