@@ -158,7 +158,7 @@ def get_metric(problem_type):
         return metrics.root_mean_squared_error
 
 
-def filter_bagged_regression_pseudo(bagged_model: BaggedEnsembleModel, X_test_data, sd_threshold: float = 0.2):
+def filter_bagged_regression_pseudo(bagged_model: BaggedEnsembleModel, X_test_data):
     list_child_models = bagged_model.models
     first_child_model = bagged_model.load_child(list_child_models[0])
     X_preprocessed = bagged_model.preprocess(X=X_test_data, model=first_child_model)
@@ -169,8 +169,9 @@ def filter_bagged_regression_pseudo(bagged_model: BaggedEnsembleModel, X_test_da
             [pred_proba, curr_model.predict_proba(X=X_preprocessed, preprocess_nonadaptive=False)])
 
     # pred_mu = pd.Series(data=np.mean(pred_proba, axis=0), index=X_test_data.index)
-    pred_sd = pd.Series(data=np.std(pred_proba, axis=0), index=X_test_data.index)
-    df_filtered = (pred_sd <= sd_threshold)
+    pred_sd = pd.Series(data=np.std(pred_proba, axis=1), index=X_test_data.index)
+    threshold = 1.5 * pred_sd.std()
+    df_filtered = (pred_sd <= threshold)
 
     return df_filtered[df_filtered == True]
 
@@ -283,7 +284,7 @@ def run_pseudo_label(best_model: BaggedEnsembleModel,
                                                           val_label=label_cleaner.inverse_transform(y_clean),
                                                           threshold=threshold)
         elif not is_classification and use_new_regression:
-            filter_bagged_regression_pseudo(best_model, X_test_clean)
+            test_pseudo_idxes_true = filter_bagged_regression_pseudo(bagged_model=best_model, X_test_data=X_test_clean)
         else:
             test_pseudo_idxes_true = TabularPredictor.filter_pseudo(None, y_pred_proba_og=y_pred_proba,
                                                                     problem_type=problem_type, threshold=threshold)
@@ -445,6 +446,10 @@ if __name__ == "__main__":
     openml_metrics = Open_ML_Metrics()
     percent_test = '_' + str(int(args.test_percent * 100)) if args.test_percent is not None else ''
     path = args.save_path[:-4] + f'_{int(args.threshold * 100)}Threshold' + percent_test + args.save_path[-4:]
+
+    # run(openml_id=41021, threshold=args.threshold, max_iter=5, open_ml_metrics=openml_metrics,
+    #     percent_test=args.test_percent)
+
     for id in benchmark:
         try:
             run(openml_id=id, threshold=args.threshold, max_iter=5, open_ml_metrics=openml_metrics,
