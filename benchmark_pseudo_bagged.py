@@ -272,8 +272,6 @@ def run_pseudo_label(best_model: BaggedEnsembleModel,
             val_pred_proba = convert_np_pred_prob(y_pred_proba=val_pred_proba, label_cleaner=label_cleaner,
                                                   problem_type=problem_type, y=y_clean)
 
-            assert val_pred_proba.index.equals(y_clean.index)
-
             if not use_Jonas:
                 test_pseudo_idxes_true = ECE_filter_pseudo(y_pred_proba=y_pred_proba, val_label=y_clean,
                                                            val_pred_proba=val_pred_proba,
@@ -291,9 +289,11 @@ def run_pseudo_label(best_model: BaggedEnsembleModel,
         test_pseudo_idxes.loc[test_pseudo_idxes_true.index] = True
 
         if len(test_pseudo_idxes_true) > 0 and len(y_pred_proba) > len(test_pseudo_idxes_true):
+            # Get current round of pseudo using selector
             X_new_pseudo = X_test_clean.loc[test_pseudo_idxes_true.index]
             y_new_pseudo = y_pred.loc[test_pseudo_idxes_true.index]
 
+            # Append or create pseudo data if iteration is 0
             if i == 0:
                 X_pseudo = X_new_pseudo
                 y_pseudo = y_new_pseudo
@@ -301,21 +301,24 @@ def run_pseudo_label(best_model: BaggedEnsembleModel,
                 X_pseudo = X_pseudo.append(X_new_pseudo, verify_integrity=True)
                 y_pseudo = y_pseudo.append(y_new_pseudo, verify_integrity=True)
 
+            # Cut down test data to remove pseudo-labeled data. Don't want to run inference on seen data
             test_not_pseudo_idxes = test_pseudo_idxes[test_pseudo_idxes == False].index
             X_test_clean = X_test_clean.loc[test_not_pseudo_idxes]
             y_test_clean = y_test_clean.loc[test_not_pseudo_idxes]
 
+            # Fit model on new data
             model_pseudo = BaggedEnsembleModel(LGBModel(eval_metric=eval_metric))
             model_pseudo.fit(X=X_clean, y=y_clean, X_pseudo=X_pseudo, y_pseudo=y_pseudo,
                              k_fold=10)  # Perform 10-fold bagging
 
+            # Get new predictions
             y_pred_proba_np = model_pseudo.predict_proba(X_test_clean)
             y_pred_proba = convert_np_pred_prob(y_pred_proba=y_pred_proba_np, label_cleaner=label_cleaner,
                                                 problem_type=problem_type, y=y_test_clean)
             y_pred = pd.Series(model_pseudo.predict(X_test_clean), name=y_test_clean.name, index=X_test_clean.index)
 
+            # Compare validation score
             curr_score = get_bagged_model_val_score_avg(model_pseudo)
-
             if curr_score > previous_val_score:
                 previous_val_score = curr_score
                 y_pred_og.loc[X_test_clean.index] = y_pred
