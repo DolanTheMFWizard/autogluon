@@ -405,6 +405,13 @@ def run(openml_id: int, threshold: float, max_iter: int, openml_metrics: Open_ML
         #                  problem_type=problem_type, label_cleaner=label_cleaner, threshold=threshold,
         #                  eval_metric=eval_metric, open_ml_id=openml_id, open_ml_metrics=openml_metrics,
         #                  use_Jonas=True)
+        run_pseudo_label(best_model=model_vanilla, X_clean=X_clean.copy(), y_clean=y_clean.copy(),
+                         X_test_clean=X_test_clean.copy(), y_test_clean=y_test_clean.copy(),
+                         previous_val_score=val_score_vanilla, y_pred=y_pred_vanilla_series.copy(),
+                         y_pred_proba=y_test_pred_proba_df.copy(), max_iter=max_iter, use_ECE=False,
+                         problem_type=problem_type, label_cleaner=label_cleaner, threshold=threshold,
+                         eval_metric=eval_metric, open_ml_id=openml_id, open_ml_metrics=openml_metrics,
+                         use_Jonas=False)
 
         run_pseudo_label(best_model=model_vanilla, X_clean=X_clean.copy(), y_clean=y_clean.copy(),
                          X_test_clean=X_test_clean.copy(), y_test_clean=y_test_clean.copy(),
