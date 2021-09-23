@@ -207,21 +207,23 @@ def ECE_filter_pseudo(y_pred_proba: pd.DataFrame, val_pred_proba: pd.DataFrame, 
         holdout_as_c_idxes = y_predicts[y_predicts == c].index
         holdout_c_probs = y_max_probs.loc[holdout_as_c_idxes]
 
-        pseudo_indexes.loc[(holdout_c_probs >= class_threshold).index] = True
+        above_thres = (holdout_c_probs >= class_threshold)
+        pseudo_indexes.loc[above_thres[above_thres == True].index] = True
 
     return pseudo_indexes[pseudo_indexes == True]
 
 
-def Jonas_filter(y_pred_proba: pd.DataFrame, val_pred_proba: pd.DataFrame, val_label: pd.Series, train_label: pd.Series,
-                 threshold: float):
+def scale_ece_filter(y_pred_proba: pd.DataFrame, val_pred_proba: pd.DataFrame, val_label: pd.Series,
+                     threshold: float):
     predictions = val_pred_proba.idxmax(axis=1)
     prediction_probs = val_pred_proba.max(axis=1)
     y_predicts = y_pred_proba.idxmax(axis=1)
     y_max_probs = y_pred_proba.max(axis=1)
-    classes = predictions.unique()
+    classes = y_pred_proba.columns
     pseudo_indexes = pd.Series(data=False, index=y_pred_proba.index)
     class_idxes_dict = dict()
     class_lens_dict = dict()
+    class_threshold_dict = dict()
 
     for c in classes:
         predicted_as_c_idxes = predictions[predictions == c].index
@@ -232,20 +234,28 @@ def Jonas_filter(y_pred_proba: pd.DataFrame, val_pred_proba: pd.DataFrame, val_l
         confidence = np.mean(predicted_c_probs.to_numpy())
         calibration = accuracy - confidence
 
-        class_threshold = threshold - (0.5 * calibration)
+        class_threshold = threshold - calibration
 
         holdout_as_c_idxes = y_predicts[y_predicts == c].index
         holdout_c_probs = y_max_probs.loc[holdout_as_c_idxes]
 
-        class_idxes_dict[c] = (holdout_c_probs >= class_threshold).index
+        above_thres_bool = holdout_c_probs >= class_threshold
+        class_idxes_dict[c] = above_thres_bool[above_thres_bool == True].index
         class_lens_dict[c] = len(class_idxes_dict[c])
+        class_threshold_dict[c] = class_threshold
 
-    train_val_fracs = train_label.value_counts(normalize=True)
     class_lens_series = pd.Series(class_lens_dict)
     min_class = class_lens_series.idxmin()
     min_class_num = class_lens_series.loc[min_class]
 
-    return None
+    if min_class_num == 0:
+        return pd.Series([])
+
+    for c, idxes in class_idxes_dict.items():
+        curr_probs = y_max_probs.loc[idxes]
+        pseudo_indexes.loc[curr_probs.sort_values().head(min_class_num).index] = True
+
+    return pseudo_indexes
 
 
 def run_pseudo_label(best_model: BaggedEnsembleModel,
@@ -273,14 +283,14 @@ def run_pseudo_label(best_model: BaggedEnsembleModel,
                                                   problem_type=problem_type, y=y_clean)
 
             if not use_Jonas:
-                test_pseudo_idxes_true = ECE_filter_pseudo(y_pred_proba=y_pred_proba, val_label=y_clean,
+                test_pseudo_idxes_true = ECE_filter_pseudo(y_pred_proba=y_pred_proba,
+                                                           val_label=label_cleaner.inverse_transform(y_clean),
                                                            val_pred_proba=val_pred_proba,
                                                            threshold=threshold)
             else:
-                test_pseudo_idxes_true = Jonas_filter(y_pred_proba=y_pred_proba, val_label=y_clean,
-                                                      val_pred_proba=val_pred_proba,
-                                                      threshold=threshold,
-                                                      train_label=label_cleaner.inverse_transform(y_clean))
+                test_pseudo_idxes_true = scale_ece_filter(y_pred_proba=y_pred_proba, val_pred_proba=val_pred_proba,
+                                                          val_label=label_cleaner.inverse_transform(y_clean),
+                                                          threshold=threshold)
         else:
             test_pseudo_idxes_true = TabularPredictor.filter_pseudo(None, y_pred_proba_og=y_pred_proba,
                                                                     problem_type=problem_type, threshold=threshold)
@@ -380,6 +390,14 @@ def run(openml_id: int, threshold: float, max_iter: int, open_ml_metrics: Open_M
                                                 problem_type=problem_type, y=y_test_clean)
 
     if problem_type in CLASSIFICATION:
+        run_pseudo_label(best_model=model_vanilla, X_clean=X_clean.copy(), y_clean=y_clean.copy(),
+                         X_test_clean=X_test_clean.copy(), y_test_clean=y_test_clean.copy(),
+                         previous_val_score=val_score_vanilla, y_pred=y_pred_vanilla_series.copy(),
+                         y_pred_proba=y_test_pred_proba_df.copy(), max_iter=max_iter, use_ECE=True,
+                         problem_type=problem_type, label_cleaner=label_cleaner, threshold=threshold,
+                         eval_metric=eval_metric, open_ml_id=openml_id, open_ml_metrics=open_ml_metrics,
+                         use_Jonas=True)
+
         run_pseudo_label(best_model=model_vanilla, X_clean=X_clean.copy(), y_clean=y_clean.copy(),
                          X_test_clean=X_test_clean.copy(), y_test_clean=y_test_clean.copy(),
                          previous_val_score=val_score_vanilla, y_pred=y_pred_vanilla_series.copy(),
