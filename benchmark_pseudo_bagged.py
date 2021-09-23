@@ -389,11 +389,6 @@ def run(openml_id: int, threshold: float, max_iter: int, openml_metrics: Open_ML
                                                                   y_pred_proba=y_test_pred_proba_df,
                                                                   problem_type=problem_type)
 
-    openml_metrics.add(model_name='Vanilla', eval_p=val_score_vanilla, openml_id=openml_id,
-                       accuracy=acc, auc=auc, neg_logloss=neg_log_loss, MAE=mae, neg_MSE=neg_mse, result=result, iter=0,
-                       metric=eval_metric.name, model_score=model_vanilla.score(X_test_clean, y_test_clean),
-                       problem_type=problem_type)
-
     if problem_type in CLASSIFICATION:
         # run_pseudo_label(best_model=model_vanilla, X_clean=X_clean.copy(), y_clean=y_clean.copy(),
         #                  X_test_clean=X_test_clean.copy(), y_test_clean=y_test_clean.copy(),
