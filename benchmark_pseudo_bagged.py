@@ -339,7 +339,7 @@ def run_pseudo_label(best_model: BaggedEnsembleModel,
     name = 'Jonas ' + name if use_Jonas else name
     open_ml_metrics.add(model_name=name, eval_p=previous_val_score, openml_id=open_ml_id,
                         accuracy=acc, auc=auc, neg_logloss=neg_log_loss, MAE=mae, neg_MSE=neg_mse, result=result,
-                        iter=i, metric=eval_metric.name, threshold=threshold, problem_type=problem_type
+                        iter=i, metric=eval_metric.name, threshold=threshold, problem_type=problem_type,
                         model_score=best_model.score(X_test_clean_og, y_test_clean_og))
 
 
