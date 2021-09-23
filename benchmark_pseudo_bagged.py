@@ -301,9 +301,6 @@ def run_pseudo_label(best_model: BaggedEnsembleModel,
                 X_pseudo = X_pseudo.append(X_new_pseudo, verify_integrity=True)
                 y_pseudo = y_pseudo.append(y_new_pseudo, verify_integrity=True)
 
-            y_pred_og.loc[test_pseudo_idxes_true.index] = y_pred.loc[test_pseudo_idxes_true.index]
-            y_pred_proba_og.loc[test_pseudo_idxes_true.index] = y_pred_proba.loc[test_pseudo_idxes_true.index]
-
             test_not_pseudo_idxes = test_pseudo_idxes[test_pseudo_idxes == False].index
             X_test_clean = X_test_clean.loc[test_not_pseudo_idxes]
             y_test_clean = y_test_clean.loc[test_not_pseudo_idxes]
@@ -321,6 +318,8 @@ def run_pseudo_label(best_model: BaggedEnsembleModel,
 
             if curr_score > previous_val_score:
                 previous_val_score = curr_score
+                y_pred_og.loc[X_test_clean.index] = y_pred
+                y_pred_proba_og.loc[X_test_clean.index] = y_pred_proba
                 result, auc, neg_log_loss, acc, mae, neg_mse = get_test_score(y_test_clean=y_test_clean_og,
                                                                               y_pred=y_pred_og,
                                                                               y_pred_proba=y_pred_proba_og,
