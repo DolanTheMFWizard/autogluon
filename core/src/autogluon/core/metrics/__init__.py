@@ -1,4 +1,3 @@
-import copy
 from abc import ABCMeta, abstractmethod
 from functools import partial
 
@@ -7,11 +6,11 @@ import scipy.stats
 import sklearn.metrics
 
 from . import classification_metrics
+from . import quantile_metrics
+from .classification_metrics import *
 from .util import sanitize_array
 from ..constants import PROBLEM_TYPES_REGRESSION, PROBLEM_TYPES_CLASSIFICATION, QUANTILE
 from ..utils.miscs import warning_filter
-from .classification_metrics import *
-from . import quantile_metrics
 
 
 class Scorer(object, metaclass=ABCMeta):
@@ -55,7 +54,8 @@ class Scorer(object, metaclass=ABCMeta):
 
     def sklearn_scorer(self):
         with warning_filter():
-            ret = sklearn.metrics.scorer.make_scorer(score_func=self, greater_is_better=True, needs_proba=self.needs_proba, needs_threshold=self.needs_threshold)
+            ret = sklearn.metrics.scorer.make_scorer(score_func=self, greater_is_better=True,
+                                                     needs_proba=self.needs_proba, needs_threshold=self.needs_threshold)
         return ret
 
     @property
@@ -424,7 +424,6 @@ pinball_loss = make_scorer('pinball_loss',
                            greater_is_better=False)
 pinball_loss.add_alias('pinball')
 
-
 # Standard Classification Scores
 accuracy = make_scorer('accuracy', sklearn.metrics.accuracy_score)
 accuracy.add_alias('acc')
@@ -432,7 +431,6 @@ accuracy.add_alias('acc')
 balanced_accuracy = make_scorer('balanced_accuracy', classification_metrics.balanced_accuracy)
 f1 = make_scorer('f1', sklearn.metrics.f1_score)
 mcc = make_scorer('mcc', sklearn.metrics.matthews_corrcoef)
-
 
 # Score functions that need decision values
 roc_auc = make_scorer('roc_auc',
@@ -491,37 +489,6 @@ def customized_log_loss(y_true, y_pred, eps=1e-15):
                                         labels=labels,
                                         eps=eps)
 
-def customized_neg_log_loss(y_true, y_pred, eps=1e-15):
-    """
-
-    Parameters
-    ----------
-    y_true : array-like or label indicator matrix
-        Ground truth (correct) labels for n_samples samples.
-
-    y_pred : array-like of float
-        The predictions. shape = (n_samples, n_classes) or (n_samples,)
-
-    eps : float
-        The epsilon
-
-    Returns
-    -------
-    loss
-        The negative log-likelihood
-    """
-    assert y_true.ndim == 1
-    if y_pred.ndim == 1:
-        # First clip the y_pred which is also used in sklearn
-        y_pred = np.clip(y_pred, eps, 1 - eps)
-        return -1 * (- (y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred)).mean())
-    else:
-        assert y_pred.ndim == 2, 'Only ndim=2 is supported'
-        labels = np.arange(y_pred.shape[1], dtype=np.int32)
-        return -1 * sklearn.metrics.log_loss(y_true.astype(np.int32), y_pred,
-                                        labels=labels,
-                                        eps=eps)
-
 
 # Score function for probabilistic classification
 log_loss = make_scorer('log_loss',
@@ -530,11 +497,6 @@ log_loss = make_scorer('log_loss',
                        greater_is_better=False,
                        needs_proba=True)
 
-neg_log_loss = make_scorer('neg_log_loss',
-                       customized_neg_log_loss,
-                       optimum=0,
-                       greater_is_better=True,
-                       needs_proba=True)
 log_loss.add_alias('nll')
 
 pac_score = make_scorer('pac_score',
@@ -544,7 +506,7 @@ pac_score = make_scorer('pac_score',
 
 REGRESSION_METRICS = dict()
 for scorer in [r2, mean_squared_error, root_mean_squared_error, mean_absolute_error,
-                   median_absolute_error, spearmanr, pearsonr]:
+               median_absolute_error, spearmanr, pearsonr]:
     if scorer.name in REGRESSION_METRICS:
         raise ValueError(f'Duplicated score name found! scorer={scorer}, name={scorer.name}. '
                          f'Consider to register with a different name.')
@@ -574,7 +536,6 @@ for scorer in [accuracy, balanced_accuracy, mcc, roc_auc, roc_auc_ovo_macro, ave
     for alias in scorer.alias:
         CLASSIFICATION_METRICS[alias] = scorer
 
-
 for name, metric in [('precision', sklearn.metrics.precision_score),
                      ('recall', sklearn.metrics.recall_score),
                      ('f1', sklearn.metrics.f1_score)]:
@@ -590,7 +551,8 @@ for name, metric in [('precision', sklearn.metrics.precision_score),
 def get_metric(metric, problem_type=None, metric_type=None) -> Scorer:
     """Returns metric function by using its name if the metric is str.
     Performs basic check for metric compatibility with given problem type."""
-    all_available_metric_names = list(CLASSIFICATION_METRICS.keys()) + list(REGRESSION_METRICS.keys()) + list(QUANTILE_METRICS.keys()) + ['soft_log_loss']
+    all_available_metric_names = list(CLASSIFICATION_METRICS.keys()) + list(REGRESSION_METRICS.keys()) + list(
+        QUANTILE_METRICS.keys()) + ['soft_log_loss']
 
     if metric is not None and isinstance(metric, str):
         if metric in CLASSIFICATION_METRICS:
