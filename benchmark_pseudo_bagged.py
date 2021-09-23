@@ -377,7 +377,7 @@ def run(openml_id: int, threshold: float, max_iter: int, open_ml_metrics: Open_M
     eval_metric = get_metric(problem_type=problem_type)
 
     if eval_metric == metrics.log_loss:
-        threshold = .99
+        threshold = .95
 
     model_vanilla = BaggedEnsembleModel(LGBModel(eval_metric=eval_metric))
     model_vanilla.fit(X=X_clean, y=y_clean, k_fold=10)  # Perform 10-fold bagging
