@@ -377,7 +377,7 @@ def run(openml_id: int, threshold: float, max_iter: int, open_ml_metrics: Open_M
     eval_metric = get_metric(problem_type=problem_type)
 
     if eval_metric == metrics.log_loss:
-        threshold = .95
+        threshold = .90
 
     model_vanilla = BaggedEnsembleModel(LGBModel(eval_metric=eval_metric))
     model_vanilla.fit(X=X_clean, y=y_clean, k_fold=10)  # Perform 10-fold bagging
@@ -437,10 +437,10 @@ if __name__ == "__main__":
                  23512, 41146, 41169, 41027, 23517, 40685, 41165, 41161, 41159, 4135, 40996, 41138, 41166, 1464, 41168,
                  41150, 1489, 41142, 3, 12, 31, 1067, 54, 1590]
     openml_metrics = Open_ML_Metrics()
-
+    path = args.save_path[:-4] + f'_{int(args.threshold*100)}_' + args.save_path[-3:]
     for id in benchmark:
         try:
             run(openml_id=id, threshold=args.threshold, max_iter=5, open_ml_metrics=openml_metrics)
-            openml_metrics.generate_csv(args.save_path)
+            openml_metrics.generate_csv(path)
         except Exception as e:
             continue
