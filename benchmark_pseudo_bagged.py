@@ -185,7 +185,8 @@ def ECE_filter_pseudo(y_pred_proba: pd.DataFrame, val_pred_proba: pd.DataFrame, 
     return pseudo_indexes[pseudo_indexes == True]
 
 
-def ECE_filter_pseudo(y_pred_proba: pd.DataFrame, val_pred_proba: pd.DataFrame, val_label: pd.Series, threshold: float):
+def ECE_filter_pseudo(y_pred_proba: pd.DataFrame, val_pred_proba: pd.DataFrame, val_label: pd.Series, threshold: float,
+                      anneal_frac: float = 0.5):
     predictions = val_pred_proba.idxmax(axis=1)
     prediction_probs = val_pred_proba.max(axis=1)
     y_predicts = y_pred_proba.idxmax(axis=1)
@@ -202,7 +203,7 @@ def ECE_filter_pseudo(y_pred_proba: pd.DataFrame, val_pred_proba: pd.DataFrame, 
         confidence = np.mean(predicted_c_probs.to_numpy())
         calibration = accuracy - confidence
 
-        class_threshold = threshold - (0.5 * calibration)
+        class_threshold = threshold - (anneal_frac * calibration)
 
         holdout_as_c_idxes = y_predicts[y_predicts == c].index
         holdout_c_probs = y_max_probs.loc[holdout_as_c_idxes]
@@ -234,7 +235,7 @@ def scale_ece_filter(y_pred_proba: pd.DataFrame, val_pred_proba: pd.DataFrame, v
         confidence = np.mean(predicted_c_probs.to_numpy())
         calibration = accuracy - confidence
 
-        class_threshold = threshold - calibration
+        class_threshold = threshold - (0.5 * calibration)
 
         holdout_as_c_idxes = y_predicts[y_predicts == c].index
         holdout_c_probs = y_max_probs.loc[holdout_as_c_idxes]
@@ -351,7 +352,7 @@ def run_pseudo_label(best_model: BaggedEnsembleModel,
                         model_score=best_model.score(X_test_clean_og, y_test_clean_og))
 
 
-def run(openml_id: int, threshold: float, max_iter: int, open_ml_metrics: Open_ML_Metrics):
+def run(openml_id: int, threshold: float, max_iter: int, open_ml_metrics: Open_ML_Metrics, percent_test: float = None):
     try:
         data = fetch_openml(data_id=openml_id, as_frame=True)
     except Exception as e:
@@ -362,7 +363,7 @@ def run(openml_id: int, threshold: float, max_iter: int, open_ml_metrics: Open_M
     label = data['target_names'][0]
     df = features.join(target)
 
-    test_frac = default_holdout_frac(len(features))
+    test_frac = default_holdout_frac(len(features)) if percent_test is None else percent_test
     test_data = df.sample(frac=test_frac, random_state=1)
     train_data = df.drop(test_data.index)
     train_data = TabularDataset(train_data)  # can be local CSV file as well, returns Pandas DataFrame
@@ -371,13 +372,13 @@ def run(openml_id: int, threshold: float, max_iter: int, open_ml_metrics: Open_M
                                                                                            test_data=test_data,
                                                                                            label=label)
 
-    if problem_type not in CLASSIFICATION or len(features) > 20000:
+    if problem_type not in CLASSIFICATION or len(features) > 30000:
         return None
 
     eval_metric = get_metric(problem_type=problem_type)
 
     if eval_metric == metrics.log_loss:
-        threshold = .90
+        threshold = .98
 
     model_vanilla = BaggedEnsembleModel(LGBModel(eval_metric=eval_metric))
     model_vanilla.fit(X=X_clean, y=y_clean, k_fold=10)  # Perform 10-fold bagging
@@ -431,16 +432,20 @@ if __name__ == "__main__":
     parser.add_argument('--save_path', type=str, nargs='+', help='Path to save results CSV', default='./results.csv')
     parser.add_argument('--threshold', type=float, nargs='+', help='Threshold for using pseudo labeling or not',
                         default=0.95)
+    parser.add_argument('--test_percent', type=float, nargs='+', help='Percent of total data used for testing',
+                        default=None)
     args = parser.parse_args()
 
     benchmark = [1468, 1596, 40981, 40984, 40975, 41163, 41147, 1111, 41164, 1169, 1486, 41143, 1461, 41167, 40668,
                  23512, 41146, 41169, 41027, 23517, 40685, 41165, 41161, 41159, 4135, 40996, 41138, 41166, 1464, 41168,
                  41150, 1489, 41142, 3, 12, 31, 1067, 54, 1590]
     openml_metrics = Open_ML_Metrics()
-    path = args.save_path[:-4] + f'_{int(args.threshold*100)}_' + args.save_path[-3:]
+    percent_test = '_' + str(int(args.test_percent * 100)) if args.test_percent is not None else ''
+    path = args.save_path[:-4] + f'_{int(args.threshold * 100)}Threshold' + percent_test + args.save_path[-4:]
     for id in benchmark:
         try:
-            run(openml_id=id, threshold=args.threshold, max_iter=5, open_ml_metrics=openml_metrics)
+            run(openml_id=id, threshold=args.threshold, max_iter=5, open_ml_metrics=openml_metrics,
+                percent_test=args.test_percent)
             openml_metrics.generate_csv(path)
         except Exception as e:
             continue
