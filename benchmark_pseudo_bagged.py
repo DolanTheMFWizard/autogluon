@@ -374,22 +374,10 @@ def run(openml_id: int, threshold: float, max_iter: int, open_ml_metrics: Open_M
 
     y_pred_vanilla_np = model_vanilla.predict(X_test_clean)
     y_pred_vanilla_series = pd.Series(y_pred_vanilla_np, index=X_test_clean.index)
-
     val_score_vanilla = get_bagged_model_val_score_avg(bagged_model=model_vanilla)
-
-    assert y_test_clean.index.equals(X_test_clean.index)
-
     y_test_pred_proba_np = model_vanilla.predict_proba(X_test_clean)
-
-    assert len(y_test_pred_proba_np) == len(X_test_clean)
-
     y_test_pred_proba_df = convert_np_pred_prob(y_pred_proba=y_test_pred_proba_np, label_cleaner=label_cleaner,
                                                 problem_type=problem_type, y=y_test_clean)
-
-    result, auc, neg_log_loss, acc, mae, neg_mse = get_test_score(y_test_clean=y_test_clean,
-                                                                  y_pred=y_pred_vanilla_series,
-                                                                  y_pred_proba=y_test_pred_proba_df,
-                                                                  problem_type=problem_type)
 
     if problem_type in CLASSIFICATION:
         run_pseudo_label(best_model=model_vanilla, X_clean=X_clean.copy(), y_clean=y_clean.copy(),
