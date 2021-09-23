@@ -158,31 +158,21 @@ def get_metric(problem_type):
         return metrics.root_mean_squared_error
 
 
-def ECE_filter_pseudo(y_pred_proba: pd.DataFrame, val_pred_proba: pd.DataFrame, val_label: pd.Series, threshold: float):
-    predictions = val_pred_proba.idxmax(axis=1)
-    prediction_probs = val_pred_proba.max(axis=1)
-    y_predicts = y_pred_proba.idxmax(axis=1)
-    y_max_probs = y_pred_proba.max(axis=1)
-    classes = predictions.unique()
-    pseudo_indexes = pd.Series(data=False, index=y_pred_proba.index)
+def filter_bagged_regression_pseudo(bagged_model: BaggedEnsembleModel, X_test_data, sd_threshold: float = 0.2):
+    list_child_models = bagged_model.models
+    first_child_model = bagged_model.load_child(list_child_models[0])
+    X_preprocessed = bagged_model.preprocess(X=X_test_data, model=first_child_model)
+    pred_proba = first_child_model.predict_proba(X=X_preprocessed, preprocess_nonadaptive=False)
+    for child in list_child_models[1:]:
+        curr_model = bagged_model.load_child(child)
+        pred_proba = np.column_stack(
+            [pred_proba, curr_model.predict_proba(X=X_preprocessed, preprocess_nonadaptive=False)])
 
-    for c in classes:
-        predicted_as_c_idxes = predictions[predictions == c].index
-        predicted_c_probs = prediction_probs.loc[predicted_as_c_idxes]
-        val_labels_as_c = val_label.loc[predicted_as_c_idxes]
+    # pred_mu = pd.Series(data=np.mean(pred_proba, axis=0), index=X_test_data.index)
+    pred_sd = pd.Series(data=np.std(pred_proba, axis=0), index=X_test_data.index)
+    df_filtered = (pred_sd <= sd_threshold)
 
-        accuracy = len(val_labels_as_c[val_labels_as_c == c]) / len(val_labels_as_c)
-        confidence = np.mean(predicted_c_probs.to_numpy())
-        calibration = accuracy - confidence
-
-        class_threshold = threshold - (0.5 * calibration)
-
-        holdout_as_c_idxes = y_predicts[y_predicts == c].index
-        holdout_c_probs = y_max_probs.loc[holdout_as_c_idxes]
-
-        pseudo_indexes.loc[(holdout_c_probs >= class_threshold).index] = True
-
-    return pseudo_indexes[pseudo_indexes == True]
+    return df_filtered[df_filtered == True]
 
 
 def ECE_filter_pseudo(y_pred_proba: pd.DataFrame, val_pred_proba: pd.DataFrame, val_label: pd.Series, threshold: float,
@@ -265,7 +255,7 @@ def run_pseudo_label(best_model: BaggedEnsembleModel,
                      previous_val_score: float, y_pred: pd.Series, y_pred_proba: pd.DataFrame,
                      max_iter: int, use_ECE: bool, problem_type: str, label_cleaner: LabelCleaner, threshold: float,
                      eval_metric, open_ml_id: int,
-                     open_ml_metrics: Open_ML_Metrics, use_Jonas: bool):
+                     open_ml_metrics: Open_ML_Metrics, use_Jonas: bool, use_new_regression: bool):
     X_test_clean_og = X_test_clean.copy()
     y_test_clean_og = y_test_clean.copy()
     y_pred_og = y_pred.copy()
@@ -275,10 +265,10 @@ def run_pseudo_label(best_model: BaggedEnsembleModel,
                                                                   y_pred=y_pred,
                                                                   y_pred_proba=y_pred_proba,
                                                                   problem_type=problem_type)
-
+    is_classification = problem_type in CLASSIFICATION
     # Run Regular Pseudo
     for i in range(max_iter):
-        if use_ECE and problem_type in CLASSIFICATION:
+        if use_ECE and is_classification:
             val_pred_proba = best_model.get_oof_pred_proba()
             val_pred_proba = convert_np_pred_prob(y_pred_proba=val_pred_proba, label_cleaner=label_cleaner,
                                                   problem_type=problem_type, y=y_clean)
@@ -292,6 +282,8 @@ def run_pseudo_label(best_model: BaggedEnsembleModel,
                 test_pseudo_idxes_true = scale_ece_filter(y_pred_proba=y_pred_proba, val_pred_proba=val_pred_proba,
                                                           val_label=label_cleaner.inverse_transform(y_clean),
                                                           threshold=threshold)
+        elif not is_classification and use_new_regression:
+            filter_bagged_regression_pseudo(best_model, X_test_clean)
         else:
             test_pseudo_idxes_true = TabularPredictor.filter_pseudo(None, y_pred_proba_og=y_pred_proba,
                                                                     problem_type=problem_type, threshold=threshold)
@@ -344,8 +336,9 @@ def run_pseudo_label(best_model: BaggedEnsembleModel,
         else:
             break
 
-    name = 'ECE Pseudo Label' if use_ECE else 'Pseudo Label'
-    name = 'Jonas ' + name if use_Jonas else name
+    name = 'ECE Pseudo Label' if use_ECE and is_classification else 'Pseudo Label'
+    name = 'Jonas ' + name if use_Jonas and is_classification else name
+    name = 'New Reg Method' if not is_classification and use_new_regression else name
     open_ml_metrics.add(model_name=name, eval_p=previous_val_score, openml_id=open_ml_id,
                         accuracy=acc, auc=auc, neg_logloss=neg_log_loss, MAE=mae, neg_MSE=neg_mse, result=result,
                         iter=i, metric=eval_metric.name, threshold=threshold, problem_type=problem_type,
@@ -372,13 +365,13 @@ def run(openml_id: int, threshold: float, max_iter: int, open_ml_metrics: Open_M
                                                                                            test_data=test_data,
                                                                                            label=label)
 
-    if problem_type not in CLASSIFICATION or len(features) > 30000:
+    if len(features) > 40000:
         return None
 
     eval_metric = get_metric(problem_type=problem_type)
 
-    if eval_metric == metrics.log_loss:
-        threshold = .98
+    # if eval_metric == metrics.log_loss:
+    #     threshold = .98
 
     model_vanilla = BaggedEnsembleModel(LGBModel(eval_metric=eval_metric))
     model_vanilla.fit(X=X_clean, y=y_clean, k_fold=10)  # Perform 10-fold bagging
@@ -390,14 +383,16 @@ def run(openml_id: int, threshold: float, max_iter: int, open_ml_metrics: Open_M
     y_test_pred_proba_df = convert_np_pred_prob(y_pred_proba=y_test_pred_proba_np, label_cleaner=label_cleaner,
                                                 problem_type=problem_type, y=y_test_clean)
 
-    if problem_type in CLASSIFICATION:
+    is_classification = problem_type in CLASSIFICATION
+
+    if is_classification:
         run_pseudo_label(best_model=model_vanilla, X_clean=X_clean.copy(), y_clean=y_clean.copy(),
                          X_test_clean=X_test_clean.copy(), y_test_clean=y_test_clean.copy(),
                          previous_val_score=val_score_vanilla, y_pred=y_pred_vanilla_series.copy(),
                          y_pred_proba=y_test_pred_proba_df.copy(), max_iter=max_iter, use_ECE=True,
                          problem_type=problem_type, label_cleaner=label_cleaner, threshold=threshold,
                          eval_metric=eval_metric, open_ml_id=openml_id, open_ml_metrics=open_ml_metrics,
-                         use_Jonas=True)
+                         use_Jonas=True, use_new_regression=False)
 
         run_pseudo_label(best_model=model_vanilla, X_clean=X_clean.copy(), y_clean=y_clean.copy(),
                          X_test_clean=X_test_clean.copy(), y_test_clean=y_test_clean.copy(),
@@ -405,7 +400,15 @@ def run(openml_id: int, threshold: float, max_iter: int, open_ml_metrics: Open_M
                          y_pred_proba=y_test_pred_proba_df.copy(), max_iter=max_iter, use_ECE=True,
                          problem_type=problem_type, label_cleaner=label_cleaner, threshold=threshold,
                          eval_metric=eval_metric, open_ml_id=openml_id, open_ml_metrics=open_ml_metrics,
-                         use_Jonas=False)
+                         use_Jonas=False, use_new_regression=False)
+    else:
+        run_pseudo_label(best_model=model_vanilla, X_clean=X_clean.copy(), y_clean=y_clean.copy(),
+                         X_test_clean=X_test_clean.copy(), y_test_clean=y_test_clean.copy(),
+                         previous_val_score=val_score_vanilla, y_pred=y_pred_vanilla_series.copy(),
+                         y_pred_proba=y_test_pred_proba_df.copy(), max_iter=max_iter, use_ECE=True,
+                         problem_type=problem_type, label_cleaner=label_cleaner, threshold=threshold,
+                         eval_metric=eval_metric, open_ml_id=openml_id, open_ml_metrics=open_ml_metrics,
+                         use_Jonas=False, use_new_regression=True)
 
     run_pseudo_label(best_model=model_vanilla, X_clean=X_clean.copy(), y_clean=y_clean.copy(),
                      X_test_clean=X_test_clean.copy(), y_test_clean=y_test_clean.copy(),
@@ -413,7 +416,7 @@ def run(openml_id: int, threshold: float, max_iter: int, open_ml_metrics: Open_M
                      y_pred_proba=y_test_pred_proba_df.copy(), max_iter=max_iter, use_ECE=False,
                      problem_type=problem_type, label_cleaner=label_cleaner, threshold=threshold,
                      eval_metric=eval_metric, open_ml_id=openml_id, open_ml_metrics=open_ml_metrics,
-                     use_Jonas=False)
+                     use_Jonas=False, use_new_regression=False)
 
     result, auc, neg_log_loss, acc, mae, neg_mse = get_test_score(y_test_clean=y_test_clean,
                                                                   y_pred=y_pred_vanilla_series,
