@@ -440,6 +440,7 @@ if __name__ == "__main__":
                         default=None)
     args = parser.parse_args()
 
+    # AutoML Benchmark
     # benchmark = [1468, 1596, 40981, 40984, 40975, 41163, 41147, 1111, 41164, 1169, 1486, 41143, 1461, 41167, 40668,
     #              23512, 41146, 41169, 41027, 23517, 40685, 41165, 41161, 41159, 4135, 40996, 41138, 41166, 1464, 41168,
     #              41150, 1489, 41142, 3, 12, 31, 1067, 54, 1590]
@@ -447,6 +448,7 @@ if __name__ == "__main__":
     # Regressions
     benchmark = [215, 216, 558, 564, 565, 574, 503, 505, 507, 528, 531, 537, 541, 546, 547, 549, 512, 497, 344, 308,
                  287, 405, 41021, 550, 495, 227, 223, 189, 196, 183]
+
     openml_metrics = Open_ML_Metrics()
     percent_test = '_' + str(int(args.test_percent * 100)) if args.test_percent is not None else ''
     path = args.save_path[:-4] + f'_{int(args.threshold * 100)}Threshold' + percent_test + args.save_path[-4:]
@@ -455,9 +457,6 @@ if __name__ == "__main__":
     #     percent_test=args.test_percent)
 
     for id in benchmark:
-        try:
-            run(openml_id=id, threshold=args.threshold, max_iter=5, open_ml_metrics=openml_metrics,
-                percent_test=args.test_percent)
-            openml_metrics.generate_csv(path)
-        except Exception as e:
-            continue
+        run(openml_id=id, threshold=args.threshold, max_iter=5, open_ml_metrics=openml_metrics,
+            percent_test=args.test_percent)
+        openml_metrics.generate_csv(path)
