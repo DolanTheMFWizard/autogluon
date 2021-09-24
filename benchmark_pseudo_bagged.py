@@ -168,10 +168,17 @@ def filter_bagged_regression_pseudo(bagged_model: BaggedEnsembleModel, X_test_da
         pred_proba = np.column_stack(
             [pred_proba, curr_model.predict_proba(X=X_preprocessed, preprocess_nonadaptive=False)])
 
-    # pred_mu = pd.Series(data=np.mean(pred_proba, axis=0), index=X_test_data.index)
     pred_sd = pd.Series(data=np.std(pred_proba, axis=1), index=X_test_data.index)
-    threshold = 1.5 * pred_sd.std()
-    df_filtered = (pred_sd <= threshold)
+    pred_sd_z = (pred_sd - pred_sd.mean()) / pred_sd.std()
+
+    # Sample 30% with lowest variance
+    # pred_sd = pred_sd.sort_values(ascending=True)
+    # num_sample = int(.3 * len(pred_sd))
+    # df_filtered = pred_sd.head(num_sample)
+    # return pd.Series(data=True, index=df_filtered.index)
+
+    threshold = 0.5
+    df_filtered = pred_sd_z.between(-1 * threshold, threshold)
 
     return df_filtered[df_filtered == True]
 
