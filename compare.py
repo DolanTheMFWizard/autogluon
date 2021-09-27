@@ -1,20 +1,39 @@
+import argparse
+
 import pandas as pd
 
-path = './results_95.csv'
 
-df = pd.read_csv(path)
-open_ml_ids = df['openml_id'].unique()
+def run(path, metric):
+    df = pd.read_csv(path)
+    open_ml_ids = df['openml_id'].unique()
+    num_openml_ids = len(open_ml_ids)
+    rank_sums = None
+    score_sums = None
 
-all = None
+    for id in open_ml_ids:
+        df_openml = df[df.openml_id == id]
+        ranks = df_openml[metric].rank(axis=0, method='average', ascending=False).to_numpy()
+        scores = df_openml[metric].to_numpy()
 
-for id in open_ml_ids:
-    df_openml = df[df.openml_id == id]
-    results = df_openml['result'].rank(axis=0, method='average', ascending=False).to_numpy()
+        if id == open_ml_ids[0]:
+            rank_sums = ranks
+            score_sums = scores
+        else:
+            rank_sums += ranks
+            score_sums += scores
 
-    if id == open_ml_ids[0]:
-        all = results
-    else:
-        all += results
+    print('Model names:')
+    print(df_openml['model'].to_numpy())
+    print('Average ranks:')
+    print(rank_sums/num_openml_ids)
+    print(f'Average {metric} score:')
+    print(score_sums/num_openml_ids)
 
-print(df_openml['model'].to_numpy())
-print(all/18)
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-metric', help='Metric to evaluate models by', default='result', type=str)
+    parser.add_argument('-path', help='Path to file', default='./results_95.csv', type=str)
+    args = parser.parse_args()
+
+    run(args.path, args.metric)
