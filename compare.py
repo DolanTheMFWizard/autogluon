@@ -33,15 +33,15 @@ def run(path, metric):
     print(f'Average {metric} score:')
     print(score_sums/num_openml_ids)
     print('Average number of iterations:')
-    print(num_iter/num_openml_ids)
+    print(num_iter_sums/num_openml_ids)
     print('Open ML Ids:')
     print(open_ml_ids)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-metric', help='Metric to evaluate models by', default='result', type=str)
-    parser.add_argument('-path', help='Path to file', default='./results_95T.csv', type=str)
+    parser.add_argument('-metric', help='Metric to evaluate models by', default='accuracy', type=str)
+    parser.add_argument('-path', help='Path to file', default='./results_95.csv', type=str)
     args = parser.parse_args()
 
     run(args.path, args.metric)
