@@ -440,7 +440,7 @@ def run(openml_id: int, threshold: float, max_iter: int, open_ml_metrics: Open_M
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Process some integers.')
-    parser.add_argument('--save_path', type=str, nargs='?', help='Path to save results CSV', default='./results.csv')
+    parser.add_argument('--save_path', type=str, nargs='?', help='Path to save results CSV', default='./annealp25ECE.csv')
     parser.add_argument('--threshold', type=float, nargs='?', help='Threshold for using pseudo labeling or not',
                         default=0.95)
     parser.add_argument('--test_percent', type=float, nargs='?', help='Percent of total data used for testing',
