@@ -28,12 +28,14 @@ def run(path, metric):
     print(rank_sums/num_openml_ids)
     print(f'Average {metric} score:')
     print(score_sums/num_openml_ids)
+    print('Open ML Ids:')
+    print(open_ml_ids)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-metric', help='Metric to evaluate models by', default='result', type=str)
-    parser.add_argument('-path', help='Path to file', default='./results_95.csv', type=str)
+    parser.add_argument('-path', help='Path to file', default='./results_95T.csv', type=str)
     args = parser.parse_args()
 
     run(args.path, args.metric)

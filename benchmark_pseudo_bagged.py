@@ -373,7 +373,7 @@ def run(openml_id: int, threshold: float, max_iter: int, open_ml_metrics: Open_M
                                                                                            test_data=test_data,
                                                                                            label=label)
 
-    if len(features) > 40000 or problem_type not in CLASSIFICATION:
+    if len(features) > 40000 or problem_type in CLASSIFICATION:
         return None
 
     eval_metric = get_metric(problem_type=problem_type)
@@ -448,13 +448,13 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # AutoML Benchmark
-    benchmark = [1468, 1596, 40981, 40984, 40975, 41163, 41147, 1111, 41164, 1169, 1486, 41143, 1461, 41167, 40668,
-                 23512, 41146, 41169, 41027, 23517, 40685, 41165, 41161, 41159, 4135, 40996, 41138, 41166, 1464, 41168,
-                 41150, 1489, 41142, 3, 12, 31, 1067, 54, 1590]
+    # benchmark = [1468, 1596, 40981, 40984, 40975, 41163, 41147, 1111, 41164, 1169, 1486, 41143, 1461, 41167, 40668,
+    #              23512, 41146, 41169, 41027, 23517, 40685, 41165, 41161, 41159, 4135, 40996, 41138, 41166, 1464, 41168,
+    #              41150, 1489, 41142, 3, 12, 31, 1067, 54, 1590]
 
     # Regressions
-    # benchmark = [215, 216, 558, 564, 565, 574, 503, 505, 507, 528, 531, 537, 541, 546, 547, 549, 512, 497, 344, 308,
-    #              287, 405, 41021, 550, 495, 227, 223, 189, 196, 183]
+    benchmark = [215, 216, 558, 564, 565, 574, 503, 505, 507, 528, 531, 537, 541, 546, 547, 549, 512, 497, 344, 308,
+                 287, 405, 41021, 550, 495, 227, 223, 189, 196, 183]
 
     openml_metrics = Open_ML_Metrics()
     percent_test = '_' + str(int(args.test_percent * 100)) if args.test_percent is not None else ''
