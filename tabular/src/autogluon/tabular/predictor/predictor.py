@@ -941,9 +941,9 @@ class TabularPredictor:
         assert (len(pseudo_indexes) == len(holdout_proba))
         return pseudo_indexes
 
-    def filter_pseudo(self, y_pred_proba_og, problem_type, min_percentage: float = 0.05, max_percentage: float = 0.6,
-                      threshold: float = 0.9):
-        if problem_type in ['binary', 'multiclass']:
+    def _filter_pseudo(self, y_pred_proba_og, min_percentage: float = 0.05, max_percentage: float = 0.6,
+                       threshold: float = 0.95):
+        if self.problem_type in ['binary', 'multiclass']:
             y_pred_proba_max = y_pred_proba_og.max(axis=1)
             curr_threshold = threshold
             # Percent of rows above threshold
@@ -975,15 +975,32 @@ class TabularPredictor:
 
     def _run_pseudo_labeling(self, hyperparameters: dict, test_data: pd.DataFrame, max_iter: int):
         previous_score = self.info()['best_model_score_val']
+        y_pred_holdout = pd.Series()
+        X_test = test_data.copy()
 
         for i in range(max_iter):
-            y_pseudo = test_data[self.label]
-            X_pseudo = test_data.drop(columns=[self.label])
-            self.fit_extra(hyperparameters=hyperparameters, X_pseudo=X_pseudo, y_pseudo=y_pseudo)
-            curr_score = self.info()['best_model_score_val']
+            y_pred_proba = self.predict_proba(data=X_test)
+            y_pred = self.predict(data=X_test)
+            test_pseudo_idxes_true = self._filter_pseudo(y_pred_proba_og=y_pred_proba)
 
-            if previous_score < curr_score:
+            if len(test_pseudo_idxes_true) < 1:
                 return self
+
+            test_pseudo_idxes = pd.Series(data=False, index=y_pred_proba.index)
+            test_pseudo_idxes[test_pseudo_idxes_true.index] = True
+
+            y_pred_holdout.append(y_pred.loc[test_pseudo_idxes_true], verify_integrity=True)
+            X_pseudo = test_data.loc[y_pred_holdout]
+
+            self.fit_extra(hyperparameters=hyperparameters, X_pseudo=X_pseudo, y_pseudo=y_pred_holdout)
+            current_score = self.info()['best_model_score_val']
+
+            if previous_score >= current_score:
+                return self
+            else:
+                # Cut down X_test to not include pseudo labeled data
+                X_test = X_test[test_pseudo_idxes[test_pseudo_idxes == False]]
+                previous_score = current_score
 
         return self
 
@@ -993,6 +1010,9 @@ class TabularPredictor:
         train_data = pd.concat([X, y], axis=1)
         test_data, is_labeled = self._validate_pseudo_data(train_data, test_data)
         is_fit = self._learner.is_fit
+
+        if not is_fit:
+            self.fit(kwargs)
 
         hyperparameters = None if 'hyperparameters' not in kwargs else kwargs['hyperparameters']
         if hyperparameters is None:
@@ -1004,18 +1024,15 @@ class TabularPredictor:
         if isinstance(hyperparameters, str):
             hyperparameters = get_hyperparameter_config(hyperparameters)
 
-        if is_fit:
-            if is_labeled:
-                y_pseudo = test_data[self.label]
-                X_pseudo = test_data.drop(columns=[self.label])
-                kwargs['y_pseudo'] = y_pseudo
-                kwargs['X_pseudo'] = X_pseudo
-                return self.fit_extra(hyperparameters=hyperparameters, **kwargs)
-            else:
-                return self._run_pseudo_labeling(hyperparameters=hyperparameters, test_data=test_data,
-                                                 max_iter=max_iter)
+        if is_labeled:
+            y_pseudo = test_data[self.label]
+            X_pseudo = test_data.drop(columns=[self.label])
+            kwargs['y_pseudo'] = y_pseudo
+            kwargs['X_pseudo'] = X_pseudo
+            return self.fit_extra(hyperparameters=hyperparameters, **kwargs)
         else:
-            pass
+            return self._run_pseudo_labeling(hyperparameters=hyperparameters, test_data=test_data,
+                                             max_iter=max_iter)
 
     def predict(self, data, model=None, as_pandas=True):
         """
