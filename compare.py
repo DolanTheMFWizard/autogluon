@@ -40,8 +40,8 @@ def run(path, metric):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-metric', help='Metric to evaluate models by', default='accuracy', type=str)
-    parser.add_argument('-path', help='Path to file', default='./results_95.csv', type=str)
+    parser.add_argument('-metric', help='Metric to evaluate models by', default='result', type=str)
+    parser.add_argument('-path', help='Path to file', default='./annealp25ECE_95Threshold.csv', type=str)
     args = parser.parse_args()
 
     run(args.path, args.metric)
