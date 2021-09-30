@@ -184,7 +184,7 @@ def filter_bagged_regression_pseudo(bagged_model: BaggedEnsembleModel, X_test_da
 
 
 def ECE_filter_pseudo(y_pred_proba: pd.DataFrame, val_pred_proba: pd.DataFrame, val_label: pd.Series, threshold: float,
-                      anneal_frac: float = 0.25):
+                      anneal_frac: float = 0.1):
     predictions = val_pred_proba.idxmax(axis=1)
     prediction_probs = val_pred_proba.max(axis=1)
     y_predicts = y_pred_proba.idxmax(axis=1)
@@ -213,7 +213,7 @@ def ECE_filter_pseudo(y_pred_proba: pd.DataFrame, val_pred_proba: pd.DataFrame, 
 
 
 def scale_ece_filter(y_pred_proba: pd.DataFrame, val_pred_proba: pd.DataFrame, val_label: pd.Series,
-                     threshold: float, anneal_frac: float = 0.25):
+                     threshold: float, anneal_frac: float = 0.1):
     predictions = val_pred_proba.idxmax(axis=1)
     prediction_probs = val_pred_proba.max(axis=1)
     y_predicts = y_pred_proba.idxmax(axis=1)
