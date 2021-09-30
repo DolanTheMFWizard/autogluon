@@ -1,5 +1,6 @@
 import argparse
 
+import numpy as np
 import pandas as pd
 
 
@@ -16,15 +17,18 @@ def run(path, metric):
     for m in model_list:
         model_wins_dict[m] = 0
 
-
     for id in open_ml_ids:
         df_openml = df[df.openml_id == id]
+        # df_openml = df_openml[df_openml.model != 'Pseudo Label']
         ranks = df_openml[metric].rank(axis=0, method='average', ascending=False).to_numpy()
         scores = df_openml[metric].to_numpy()
-        models = df_openml['model'].to_numpy()
-        model_winner = models[ranks.argmin()]
 
-        model_wins_dict[model_winner] += 1
+        # models = df_openml['model'].to_numpy()
+
+        # if scores[0] != scores[1]:
+        #     model_winner = models[ranks.argmin()]
+        #
+        #     model_wins_dict[model_winner] += 1
 
         num_iter = df_openml['max_num_ter'].to_numpy()
 
@@ -40,11 +44,11 @@ def run(path, metric):
     print('Model names:')
     print(df_openml['model'].to_numpy())
     print('Average ranks:')
-    print(rank_sums/num_openml_ids)
+    print(rank_sums / num_openml_ids)
     print(f'Average {metric} score:')
-    print(score_sums/num_openml_ids)
+    print(score_sums / num_openml_ids)
     print('Average number of iterations:')
-    print(num_iter_sums/num_openml_ids)
+    print(num_iter_sums / num_openml_ids)
     print('Models 1st place counts:')
     print(model_wins_dict)
     print('Open ML Ids:')
