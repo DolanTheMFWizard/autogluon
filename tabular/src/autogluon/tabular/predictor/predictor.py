@@ -909,6 +909,59 @@ class TabularPredictor:
         self.save()
         return self
 
+    # def _std_pseudo(X_test_data):
+    #     list_child_models = bagged_model.models
+    #     first_child_model = bagged_model.load_child(list_child_models[0])
+    #     X_preprocessed = bagged_model.preprocess(X=X_test_data, model=first_child_model)
+    #     pred_proba = first_child_model.predict_proba(X=X_preprocessed, preprocess_nonadaptive=False)
+    #     for child in list_child_models[1:]:
+    #         curr_model = bagged_model.load_child(child)
+    #         pred_proba = np.column_stack(
+    #             [pred_proba, curr_model.predict_proba(X=X_preprocessed, preprocess_nonadaptive=False)])
+    #
+    #     pred_sd = pd.Series(data=np.std(pred_proba, axis=1), index=X_test_data.index)
+    #     pred_sd_z = (pred_sd - pred_sd.mean()) / pred_sd.std()
+    #
+    #     # Sample 30% with lowest variance
+    #     # pred_sd = pred_sd.sort_values(ascending=True)
+    #     # num_sample = int(.3 * len(pred_sd))
+    #     # df_filtered = pred_sd.head(num_sample)
+    #     # return pd.Series(data=True, index=df_filtered.index)
+    #
+    #     threshold = 1
+    #     df_filtered = pred_sd_z.between(-1 * threshold, threshold)
+    #
+    #     return df_filtered[df_filtered == True]
+
+    def _ECE_filter_pseudo(self, y_pred_proba: pd.DataFrame, val_pred_proba: pd.DataFrame, val_label: pd.Series,
+                          threshold: float,
+                          anneal_frac: float = 0.1):
+        predictions = val_pred_proba.idxmax(axis=1)
+        prediction_probs = val_pred_proba.max(axis=1)
+        y_predicts = y_pred_proba.idxmax(axis=1)
+        y_max_probs = y_pred_proba.max(axis=1)
+        classes = predictions.unique()
+        pseudo_indexes = pd.Series(data=False, index=y_pred_proba.index)
+
+        for c in classes:
+            predicted_as_c_idxes = predictions[predictions == c].index
+            predicted_c_probs = prediction_probs.loc[predicted_as_c_idxes]
+            val_labels_as_c = val_label.loc[predicted_as_c_idxes]
+
+            accuracy = len(val_labels_as_c[val_labels_as_c == c]) / len(val_labels_as_c)
+            confidence = np.mean(predicted_c_probs.to_numpy())
+            calibration = accuracy - confidence
+
+            class_threshold = threshold - (anneal_frac * calibration)
+
+            holdout_as_c_idxes = y_predicts[y_predicts == c].index
+            holdout_c_probs = y_max_probs.loc[holdout_as_c_idxes]
+
+            above_thres = (holdout_c_probs >= class_threshold)
+            pseudo_indexes.loc[above_thres[above_thres == True].index] = True
+
+        return pseudo_indexes[pseudo_indexes == True]
+
 
     def _filter_pseudo(self, y_pred_proba_og, min_percentage: float = 0.05, max_percentage: float = 0.6,
                       threshold: float = 0.95):
@@ -956,7 +1009,7 @@ class TabularPredictor:
 
         return test_pseudo_indices
 
-    def _run_pseudolabeling(self, hyperparameters: dict, test_data: pd.DataFrame, max_iter: int):
+    def _run_pseudolabeling(self, hyperparameters: dict, test_data: pd.DataFrame, max_iter: int, use_calibrated: bool = False):
         """
             Runs pseudolabeling algorithm using the same hyperparameters and model and fit settings
             that the first fit unless specified by the user. Will keep incorporating self labeled
@@ -970,6 +1023,8 @@ class TabularPredictor:
             using pseudolabeling
             max_iter: The maximum number of iterations allowed for this instance of pseudo
             labeling
+            use_calibrated: Flag for filtering pseudolabeled predictions based on model
+            calibraiton
         """
         previous_score = self.info()['best_model_score_val']
         y_pred_holdout = pd.Series()
@@ -981,7 +1036,12 @@ class TabularPredictor:
             logger.log(20, f'Beginning iteration {iter_print} of pseudolabeling')
             y_pred_proba = self.predict_proba(data=X_test)
             y_pred = self.predict(data=X_test)
-            test_pseudo_idxes_true = self._filter_pseudo(y_pred_proba_og=y_pred_proba)
+
+            if use_calibrated:
+                if self.problem_type in ['multiclass', 'binary']:
+                    test_pseudo_idxes_true = self._ECE_filter_pseudo(y_pred_proba=y_pred_proba)
+            else:
+                test_pseudo_idxes_true = self._filter_pseudo(y_pred_proba_og=y_pred_proba)
 
             if len(test_pseudo_idxes_true) < 1:
                 logger.log(20,
@@ -1012,7 +1072,8 @@ class TabularPredictor:
 
         return self
 
-    def pseudolabel_fit(self, test_data: pd.DataFrame, max_iter: int = 5, **kwargs):
+    def pseudolabel_fit(self, test_data: pd.DataFrame, max_iter: int = 5, use_calibrated: bool = False,
+                        **kwargs):
         """
             Pseudolabeling algorithm user entry function. If model is not fit at all will fit a model
             using specified settings before running pseudo labeling.
@@ -1052,7 +1113,7 @@ class TabularPredictor:
             return self.fit_extra(hyperparameters=hyperparameters, name_suffix=PSEUDO_MODEL_SUFFIX.format(iter=1), **kwargs)
         else:
             return self._run_pseudolabeling(hyperparameters=hyperparameters, test_data=test_data,
-                                             max_iter=max_iter)
+                                             max_iter=max_iter, use_calibrated=use_calibrated)
 
     def predict(self, data, model=None, as_pandas=True):
         """
