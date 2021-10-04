@@ -909,50 +909,66 @@ class TabularPredictor:
         self.save()
         return self
 
-    # def _std_pseudo(X_test_data):
-    #     list_child_models = bagged_model.models
-    #     first_child_model = bagged_model.load_child(list_child_models[0])
-    #     X_preprocessed = bagged_model.preprocess(X=X_test_data, model=first_child_model)
-    #     pred_proba = first_child_model.predict_proba(X=X_preprocessed, preprocess_nonadaptive=False)
-    #     for child in list_child_models[1:]:
-    #         curr_model = bagged_model.load_child(child)
-    #         pred_proba = np.column_stack(
-    #             [pred_proba, curr_model.predict_proba(X=X_preprocessed, preprocess_nonadaptive=False)])
-    #
-    #     pred_sd = pd.Series(data=np.std(pred_proba, axis=1), index=X_test_data.index)
-    #     pred_sd_z = (pred_sd - pred_sd.mean()) / pred_sd.std()
-    #
-    #     # Sample 30% with lowest variance
-    #     # pred_sd = pred_sd.sort_values(ascending=True)
-    #     # num_sample = int(.3 * len(pred_sd))
-    #     # df_filtered = pred_sd.head(num_sample)
-    #     # return pd.Series(data=True, index=df_filtered.index)
-    #
-    #     threshold = 1
-    #     df_filtered = pred_sd_z.between(-1 * threshold, threshold)
-    #
-    #     return df_filtered[df_filtered == True]
+    def _std_pseudo(self, X_test_data):
+        if 'BAG' in self.get_model_best():
+            self._trainer.get_model_best()
+            bagged_model = None
+            list_child_models = bagged_model.models
+            first_child_model = bagged_model.load_child(list_child_models[0])
+            X_preprocessed = bagged_model.preprocess(X=X_test_data, model=first_child_model)
+            pred_proba = first_child_model.predict_proba(X=X_preprocessed, preprocess_nonadaptive=False)
+            for child in list_child_models[1:]:
+                curr_model = bagged_model.load_child(child)
+                pred_proba = np.column_stack(
+                    [pred_proba, curr_model.predict_proba(X=X_preprocessed, preprocess_nonadaptive=False)])
+        else:
+            self.leaderboard()
+
+        pred_sd = pd.Series(data=np.std(pred_proba, axis=1), index=X_test_data.index)
+        pred_sd_z = (pred_sd - pred_sd.mean()) / pred_sd.std()
+
+        threshold = 1
+        df_filtered = pred_sd_z.between(-1 * threshold, threshold)
+
+        return df_filtered[df_filtered == True]
+
+    def _adjust_pseudolabel_threshold(self, y_pred_proba_max, threshold: float,
+                                      min_percentage: float = 0.05, max_percentage: float = 0.6):
+        curr_threshold = threshold
+        curr_percentage = (y_pred_proba_max >= curr_threshold).mean()
+        num_rows = len(y_pred_proba_max)
+
+        if curr_percentage > max_percentage or curr_percentage < min_percentage:
+            if curr_percentage > max_percentage:
+                num_rows_threshold = max(np.ceil(max_percentage * num_rows), 1)
+            else:
+                num_rows_threshold = max(np.ceil(min_percentage * num_rows), 1)
+            y_pred_proba_max_sorted = y_pred_proba_max.sort_values(ascending=False, ignore_index=True)
+            curr_threshold = y_pred_proba_max_sorted[num_rows_threshold - 1]
+
+        return curr_threshold
 
     def _ECE_filter_pseudo(self, y_pred_proba: pd.DataFrame, val_pred_proba: pd.DataFrame, val_label: pd.Series,
-                          threshold: float,
-                          anneal_frac: float = 0.1):
+                          threshold: float = 0.95, anneal_frac: float = 0.1):
         predictions = val_pred_proba.idxmax(axis=1)
-        prediction_probs = val_pred_proba.max(axis=1)
+        y_pred_proba_max = val_pred_proba.max(axis=1)
         y_predicts = y_pred_proba.idxmax(axis=1)
         y_max_probs = y_pred_proba.max(axis=1)
         classes = predictions.unique()
         pseudo_indexes = pd.Series(data=False, index=y_pred_proba.index)
+        threshold = self._adjust_pseudolabel_threshold(y_pred_proba_max=y_max_probs, threshold=threshold)
 
         for c in classes:
             predicted_as_c_idxes = predictions[predictions == c].index
-            predicted_c_probs = prediction_probs.loc[predicted_as_c_idxes]
+            predicted_probs = y_pred_proba_max.loc[predicted_as_c_idxes]
             val_labels_as_c = val_label.loc[predicted_as_c_idxes]
 
             accuracy = len(val_labels_as_c[val_labels_as_c == c]) / len(val_labels_as_c)
-            confidence = np.mean(predicted_c_probs.to_numpy())
-            calibration = accuracy - confidence
+            confidence = predicted_probs.mean()
+            class_calibration = accuracy - confidence
+            class_calibration = 0 if class_calibration < 0 else class_calibration
 
-            class_threshold = threshold - (anneal_frac * calibration)
+            class_threshold = threshold - (anneal_frac * class_calibration)
 
             holdout_as_c_idxes = y_predicts[y_predicts == c].index
             holdout_c_probs = y_max_probs.loc[holdout_as_c_idxes]
@@ -963,8 +979,7 @@ class TabularPredictor:
         return pseudo_indexes[pseudo_indexes == True]
 
 
-    def _filter_pseudo(self, y_pred_proba_og, min_percentage: float = 0.05, max_percentage: float = 0.6,
-                      threshold: float = 0.95):
+    def _filter_pseudo(self, y_pred_proba_og, threshold: float = 0.95):
         """
             Takes in the predicted probabilities of the model and chooses the indices that meet
             a criteria to incorporate into training data. Criteria is determined by problem_type
@@ -983,21 +998,7 @@ class TabularPredictor:
         """
         if self.problem_type in ['binary', 'multiclass']:
             y_pred_proba_max = y_pred_proba_og.max(axis=1)
-            curr_threshold = threshold
-            curr_percentage = (y_pred_proba_max >= curr_threshold).mean()
-            num_rows = len(y_pred_proba_max)
-
-            if curr_percentage > max_percentage or curr_percentage < min_percentage:
-                if curr_percentage > max_percentage:
-                    num_rows_threshold = max(np.ceil(max_percentage * num_rows), 1)
-                else:
-                    num_rows_threshold = max(np.ceil(min_percentage * num_rows), 1)
-                y_pred_proba_max_sorted = y_pred_proba_max.sort_values(ascending=False, ignore_index=True)
-                # Set current threshold to num_rows_threshold - 1 if num of rows above
-                # max_percentage or below min_percentage
-                curr_threshold = y_pred_proba_max_sorted[num_rows_threshold - 1]
-
-            # Pseudo indices greater than threshold
+            curr_threshold = self._adjust_pseudolabel_threshold(y_pred_proba_max=y_pred_proba_max, threshold=threshold)
             test_pseudo_indices = (y_pred_proba_max >= curr_threshold)
         else:
             # Select a random 30% of the data to use as pseudo
@@ -1039,7 +1040,17 @@ class TabularPredictor:
 
             if use_calibrated:
                 if self.problem_type in ['multiclass', 'binary']:
-                    test_pseudo_idxes_true = self._ECE_filter_pseudo(y_pred_proba=y_pred_proba)
+                    if 'BAG' in self.get_model_best():
+                        y_pred_val = self.get_oof_pred_proba(self.get_model_best())
+                        y_val = self._trainer.load_y()
+                    else:
+                        X_val = self._trainer.load_X_val()
+                        y_pred_val = self.predict_proba(X_val)
+                        y_val = self._trainer.load_y_val()
+
+                    y_val = self._learner.label_cleaner.inverse_transform(y_val)
+                    test_pseudo_idxes_true = self._ECE_filter_pseudo(y_pred_proba=y_pred_proba,
+                                                                     val_pred_proba=y_pred_val, val_label=y_val)
             else:
                 test_pseudo_idxes_true = self._filter_pseudo(y_pred_proba_og=y_pred_proba)
 
