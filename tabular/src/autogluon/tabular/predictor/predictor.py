@@ -909,26 +909,21 @@ class TabularPredictor:
         self.save()
         return self
 
-    def _std_regression_pseudo(self, X_test_data):
-        if 'BAG' in self.get_model_best():
-            self._trainer.get_model_best()
-            bagged_model = None
-            list_child_models = bagged_model.models
-            first_child_model = bagged_model.load_child(list_child_models[0])
-            X_preprocessed = bagged_model.preprocess(X=X_test_data, model=first_child_model)
-            pred_proba = first_child_model.predict_proba(X=X_preprocessed, preprocess_nonadaptive=False)
-            for child in list_child_models[1:]:
-                curr_model = bagged_model.load_child(child)
-                pred_proba = np.column_stack(
-                    [pred_proba, curr_model.predict_proba(X=X_preprocessed, preprocess_nonadaptive=False)])
-        else:
-            self.leaderboard()
+    def _std_regression_pseudo(self, X_test_data, k:int = 5, z_score_threshold:float = 0.5):
+        top_k_models_list = list(self._trainer.leaderboard()['model'][:k])
+        pred_proba = None
+        for model in top_k_models_list:
+            y_test_pred = self.predict(data=X_test_data, model=model)
+            if model == top_k_models_list[0]:
+                pred_proba = y_test_pred
+            else:
+                pred_proba = pd.concat([pred_proba, y_test_pred], axis=1)
+        pred_proba = pred_proba.to_numpy()
 
         pred_sd = pd.Series(data=np.std(pred_proba, axis=1), index=X_test_data.index)
-        pred_sd_z = (pred_sd - pred_sd.mean()) / pred_sd.std()
+        pred_z_score = (pred_sd - pred_sd.mean()) / pred_sd.std()
 
-        threshold = 1
-        df_filtered = pred_sd_z.between(-1 * threshold, threshold)
+        df_filtered = pred_z_score.between(-1 * z_score_threshold, z_score_threshold)
 
         return df_filtered[df_filtered == True]
 
@@ -1051,6 +1046,8 @@ class TabularPredictor:
                     y_val = self._learner.label_cleaner.inverse_transform(y_val)
                     test_pseudo_idxes_true = self._ECE_filter_pseudo(y_pred_proba=y_pred_proba,
                                                                      val_pred_proba=y_pred_val, val_label=y_val)
+                else:
+                    test_pseudo_idxes_true = self._std_regression_pseudo(X_test)
             else:
                 test_pseudo_idxes_true = self._filter_pseudo(y_pred_proba_og=y_pred_proba)
 
