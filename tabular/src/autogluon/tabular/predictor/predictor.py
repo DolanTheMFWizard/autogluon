@@ -909,7 +909,7 @@ class TabularPredictor:
         self.save()
         return self
 
-    def _std_pseudo(self, X_test_data):
+    def _std_regression_pseudo(self, X_test_data):
         if 'BAG' in self.get_model_best():
             self._trainer.get_model_best()
             bagged_model = None
@@ -949,7 +949,7 @@ class TabularPredictor:
         return curr_threshold
 
     def _ECE_filter_pseudo(self, y_pred_proba: pd.DataFrame, val_pred_proba: pd.DataFrame, val_label: pd.Series,
-                          threshold: float = 0.95, anneal_frac: float = 0.1):
+                          threshold: float = 0.95, anneal_frac: float = 0.2):
         predictions = val_pred_proba.idxmax(axis=1)
         y_pred_proba_max = val_pred_proba.max(axis=1)
         y_predicts = y_pred_proba.idxmax(axis=1)
