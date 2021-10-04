@@ -981,11 +981,13 @@ class TabularPredictor:
         y_pred_holdout = pd.Series()
         X_test = test_data.copy()
         test_data = self._learner.feature_generator.transform(test_data)
+        y_pred_proba_ret = None
 
         for i in range(max_iter):
             iter_print = str(i + 1)
             logger.log(20, f'Beginning iteration {iter_print} of pseudolabeling')
             y_pred_proba = self.predict_proba(data=X_test)
+
             y_pred = self.predict(data=X_test)
             test_pseudo_idxes_true = self._filter_pseudo(y_pred_proba_og=y_pred_proba)
 
@@ -1001,6 +1003,11 @@ class TabularPredictor:
             test_pseudo_idxes[test_pseudo_idxes_true.index] = True
 
             y_pred_holdout = y_pred_holdout.append(y_pred.loc[test_pseudo_idxes_true.index], verify_integrity=True)
+            if i == 0:
+                y_pred_proba_ret = y_pred_proba
+            else:
+                y_pred_proba_ret.loc[test_pseudo_idxes_true.index] = y_pred_proba.loc[test_pseudo_idxes_true.index]
+
             X_pseudo = test_data.loc[y_pred_holdout.index]
             y_pseudo = self._learner.label_cleaner.transform(y_pred_holdout)
             pseudo_data = X_pseudo
@@ -1010,7 +1017,7 @@ class TabularPredictor:
             current_score = self.info()['best_model_score_val']
 
             if previous_score >= current_score:
-                return self
+                return self, y_pred_proba_ret
             else:
                 # Cut down X_test to not include pseudo labeled data
                 logger.log(20,
@@ -1018,7 +1025,7 @@ class TabularPredictor:
                 X_test = X_test.loc[test_pseudo_idxes[test_pseudo_idxes == False].index]
                 previous_score = current_score
 
-        return self
+        return self, y_pred_proba_ret
 
     def fit_pseudolabel(self, test_data: pd.DataFrame, max_iter: int = 5, **kwargs):
         """
@@ -1062,7 +1069,7 @@ class TabularPredictor:
             fit_extra_args += list(self.fit_extra.__code__.co_varnames)
             fit_extra_kwargs = {key: value for key, value in kwargs.items() if key in fit_extra_args}
             return self.fit_extra(hyperparameters=hyperparameters, name_suffix=PSEUDO_MODEL_SUFFIX.format(iter=1),
-                                  **fit_extra_kwargs)
+                                  **fit_extra_kwargs), y_pseudo
         else:
             return self._run_pseudolabeling(hyperparameters=hyperparameters, test_data=test_data,
                                              max_iter=max_iter)
