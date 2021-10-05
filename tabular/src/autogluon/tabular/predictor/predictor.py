@@ -951,6 +951,26 @@ class TabularPredictor:
 
     def _ECE_filter_pseudo(self, y_pred_proba: pd.DataFrame, val_pred_proba: pd.DataFrame, val_label: pd.Series,
                           threshold: float = 0.95, anneal_frac: float = 0.2):
+        """
+            Takes in the predicted probabilities of the model and chooses the indices that meet
+            a criteria to incorporate into training data. Criteria predictive probability that is
+            above the threshold - class calibration * anneal_frac
+
+            Parameters:
+            -----------
+            y_pred_proba_og: The predicted probabilities from the current best model. If problem is
+            'binary' or 'multiclass' then it's Panda series of predictive probs, if it's 'regression'
+            then it's a scalar
+            val_pred_proba: The predicted probability from the model for the validation set
+            val_label: The validation set labels
+            threshold: The predictive probability percent that must be exceeded in order to be
+            incorporated into the next round of training
+            anneal_frac: How much to scale the calculated class calibration when subtracting from
+            threshold
+            Returns:
+            --------
+            pd Dataframe of selected indices
+        """
         predictions = val_pred_proba.idxmax(axis=1)
         y_pred_proba_max = val_pred_proba.max(axis=1)
         y_predicts = y_pred_proba.idxmax(axis=1)
