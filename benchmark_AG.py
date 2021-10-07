@@ -245,6 +245,92 @@ def epsilon_shift(predictor: TabularPredictor, y_pred_proba: pd.DataFrame,
     return output, output.idxmax(axis=1)
 
 
+def run(open_ml_data, open_ml_metrics):
+    features = open_ml_data['data']
+    target = open_ml_data['target']
+    label = open_ml_data['target_names'][0]
+
+    problem_type = infer_problem_type(target)
+
+    if problem_type != MU:
+        print(f'Id: {id} is not multiclass')
+        return
+
+    if problem_type is BI:
+        eval_metric = 'roc_auc'
+    else:
+        eval_metric = 'nll'
+
+    df = features.join(target)
+    test_frac = default_holdout_frac(len(features)) if percent_test is None else percent_test
+    test_data = df.sample(frac=test_frac, random_state=1)
+    y = test_data[label]
+    test_data = test_data.drop(columns=label)
+    train_data = df.drop(test_data.index)
+    validation_frac = default_holdout_frac(len(train_data))
+    validation_data = train_data.sample(frac=validation_frac, random_state=1)
+    train_data = train_data.drop(validation_data.index)
+
+    predictor = TabularPredictor(label=label, eval_metric=eval_metric).fit(train_data=train_data,
+                                                                           tuning_data=validation_data)
+    y_pred = predictor.predict(data=test_data)
+    y_pred_proba = predictor.predict_proba(data=test_data)
+    result, auc, neg_log_loss, acc, neg_mae, neg_mse = get_test_score(y_test_clean=y, y_pred=y_pred,
+                                                                      y_pred_proba=y_pred_proba,
+                                                                      problem_type=problem_type)
+
+    open_ml_metrics.add(model_name='Vanilla', eval_p=predictor._trainer.leaderboard()['score_val'][0], openml_id=id,
+                        accuracy=acc, auc=auc, neg_logloss=neg_log_loss, MAE=neg_mae, neg_MSE=neg_mse, result=result,
+                        metric=eval_metric, problem_type=problem_type)
+
+    y_pred_proba_temp, y_pred_temp = temperature_scale(predictor=predictor, y_pred_proba=y_pred_proba,
+                                                       validation_data=validation_data, y_label=y)
+
+    result, auc, neg_log_loss, acc, neg_mae, neg_mse = get_test_score(y_test_clean=y, y_pred=y_pred_temp,
+                                                                      y_pred_proba=y_pred_proba_temp,
+                                                                      problem_type=problem_type)
+
+    open_ml_metrics.add(model_name='Temperature', eval_p=predictor._trainer.leaderboard()['score_val'][0],
+                        openml_id=id, accuracy=acc, auc=auc, neg_logloss=neg_log_loss, MAE=neg_mae, neg_MSE=neg_mse,
+                        result=result, metric=eval_metric, problem_type=problem_type)
+
+    y_pred_proba_ep, y_pred_ep = epsilon_shift(predictor=predictor, y_pred_proba=y_pred_proba,
+                                               validation_data=validation_data, y_label=y)
+
+    result, auc, neg_log_loss, acc, neg_mae, neg_mse = get_test_score(y_test_clean=y, y_pred=y_pred_ep,
+                                                                      y_pred_proba=y_pred_proba_ep,
+                                                                      problem_type=problem_type)
+
+    open_ml_metrics.add(model_name='Epsilon', eval_p=predictor._trainer.leaderboard()['score_val'][0],
+                        openml_id=id, accuracy=acc, auc=auc, neg_logloss=neg_log_loss, MAE=neg_mae, neg_MSE=neg_mse,
+                        result=result, metric=eval_metric, problem_type=problem_type)
+
+    y_pred_proba_Jonas, y_pred_Jonas, PL_predictor = balance_pseudo(y_pred_proba_og=y_pred_proba, X_test=test_data,
+                                                                    y_label=y, predictor=predictor)
+
+    result, auc, neg_log_loss, acc, neg_mae, neg_mse = get_test_score(y_test_clean=y, y_pred=y_pred_Jonas,
+                                                                      y_pred_proba=y_pred_proba_Jonas,
+                                                                      problem_type=problem_type)
+
+    open_ml_metrics.add(model_name='Jonas', eval_p=PL_predictor._trainer.leaderboard()['score_val'][0],
+                        openml_id=id, accuracy=acc, auc=auc, neg_logloss=neg_log_loss, MAE=neg_mae, neg_MSE=neg_mse,
+                        result=result, metric=eval_metric, problem_type=problem_type)
+
+    y_pred_proba_Jonas, y_pred_Jonas, PL_predictor = balance_pseudo_no_holdouts(y_pred_proba_og=y_pred_proba,
+                                                                                X_test=test_data,
+                                                                                y_label=y, predictor=predictor)
+
+    result, auc, neg_log_loss, acc, neg_mae, neg_mse = get_test_score(y_test_clean=y, y_pred=y_pred_Jonas,
+                                                                      y_pred_proba=y_pred_proba_Jonas,
+                                                                      problem_type=problem_type)
+
+    open_ml_metrics.add(model_name='Jonas_no_holdout', eval_p=PL_predictor._trainer.leaderboard()['score_val'][0],
+                        openml_id=id, accuracy=acc, auc=auc, neg_logloss=neg_log_loss, MAE=neg_mae, neg_MSE=neg_mse,
+                        result=result, metric=eval_metric, problem_type=problem_type)
+
+    open_ml_metrics.generate_csv(path=args.save_path)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Process some integers.')
     parser.add_argument('--save_path', type=str, nargs='?', help='Path to save results CSV',
@@ -264,7 +350,7 @@ if __name__ == "__main__":
                                                                    333, 50, 451, 1038, 1046, 188, 42, 307, 54, 470,
                                                                    469, 151, 458, 377, 375, 1063]
 
-    openml_metrics = Open_ML_Metrics()
+    metrics_object = Open_ML_Metrics()
     percent_test = args.test_percent
 
     for id in benchmark:
@@ -275,86 +361,4 @@ if __name__ == "__main__":
             print(e)
             continue
 
-        features = data['data']
-        target = data['target']
-        label = data['target_names'][0]
-
-        problem_type = infer_problem_type(target)
-
-        if problem_type != MU or len(features) > 10000:
-            print(f'Id: {id} is not multiclass')
-            continue
-
-        if problem_type is BI:
-            eval_metric = 'roc_auc'
-        else:
-            eval_metric = 'nll'
-
-        df = features.join(target)
-        test_frac = default_holdout_frac(len(features)) if percent_test is None else percent_test
-        test_data = df.sample(frac=test_frac, random_state=1)
-        y = test_data[label]
-        test_data = test_data.drop(columns=label)
-        train_data = df.drop(test_data.index)
-        validation_frac = default_holdout_frac(len(train_data))
-        validation_data = train_data.sample(frac=validation_frac, random_state=1)
-        train_data = train_data.drop(validation_data.index)
-
-        predictor = TabularPredictor(label=label, eval_metric=eval_metric).fit(train_data=train_data,
-                                                                               tuning_data=validation_data)
-        y_pred = predictor.predict(data=test_data)
-        y_pred_proba = predictor.predict_proba(data=test_data)
-        result, auc, neg_log_loss, acc, neg_mae, neg_mse = get_test_score(y_test_clean=y, y_pred=y_pred,
-                                                                          y_pred_proba=y_pred_proba,
-                                                                          problem_type=problem_type)
-
-        openml_metrics.add(model_name='Vanilla', eval_p=predictor._trainer.leaderboard()['score_val'][0], openml_id=id,
-                           accuracy=acc, auc=auc, neg_logloss=neg_log_loss, MAE=neg_mae, neg_MSE=neg_mse, result=result,
-                           metric=eval_metric, problem_type=problem_type)
-
-        y_pred_proba_temp, y_pred_temp = temperature_scale(predictor=predictor, y_pred_proba=y_pred_proba,
-                                                           validation_data=validation_data, y_label=y)
-
-        result, auc, neg_log_loss, acc, neg_mae, neg_mse = get_test_score(y_test_clean=y, y_pred=y_pred_temp,
-                                                                          y_pred_proba=y_pred_proba_temp,
-                                                                          problem_type=problem_type)
-
-        openml_metrics.add(model_name='Temperature', eval_p=predictor._trainer.leaderboard()['score_val'][0],
-                           openml_id=id, accuracy=acc, auc=auc, neg_logloss=neg_log_loss, MAE=neg_mae, neg_MSE=neg_mse,
-                           result=result, metric=eval_metric, problem_type=problem_type)
-
-        y_pred_proba_ep, y_pred_ep = epsilon_shift(predictor=predictor, y_pred_proba=y_pred_proba,
-                                                   validation_data=validation_data, y_label=y)
-
-        result, auc, neg_log_loss, acc, neg_mae, neg_mse = get_test_score(y_test_clean=y, y_pred=y_pred_ep,
-                                                                          y_pred_proba=y_pred_proba_ep,
-                                                                          problem_type=problem_type)
-
-        openml_metrics.add(model_name='Epsilon', eval_p=predictor._trainer.leaderboard()['score_val'][0],
-                           openml_id=id, accuracy=acc, auc=auc, neg_logloss=neg_log_loss, MAE=neg_mae, neg_MSE=neg_mse,
-                           result=result, metric=eval_metric, problem_type=problem_type)
-
-        y_pred_proba_Jonas, y_pred_Jonas, PL_predictor = balance_pseudo(y_pred_proba_og=y_pred_proba, X_test=test_data,
-                                                                        y_label=y, predictor=predictor)
-
-        result, auc, neg_log_loss, acc, neg_mae, neg_mse = get_test_score(y_test_clean=y, y_pred=y_pred_Jonas,
-                                                                          y_pred_proba=y_pred_proba_Jonas,
-                                                                          problem_type=problem_type)
-
-        openml_metrics.add(model_name='Jonas', eval_p=PL_predictor._trainer.leaderboard()['score_val'][0],
-                           openml_id=id, accuracy=acc, auc=auc, neg_logloss=neg_log_loss, MAE=neg_mae, neg_MSE=neg_mse,
-                           result=result, metric=eval_metric, problem_type=problem_type)
-
-        y_pred_proba_Jonas, y_pred_Jonas, PL_predictor = balance_pseudo_no_holdouts(y_pred_proba_og=y_pred_proba,
-                                                                                    X_test=test_data,
-                                                                                    y_label=y, predictor=predictor)
-
-        result, auc, neg_log_loss, acc, neg_mae, neg_mse = get_test_score(y_test_clean=y, y_pred=y_pred_Jonas,
-                                                                          y_pred_proba=y_pred_proba_Jonas,
-                                                                          problem_type=problem_type)
-
-        openml_metrics.add(model_name='Jonas_no_holdout', eval_p=PL_predictor._trainer.leaderboard()['score_val'][0],
-                           openml_id=id, accuracy=acc, auc=auc, neg_logloss=neg_log_loss, MAE=neg_mae, neg_MSE=neg_mse,
-                           result=result, metric=eval_metric, problem_type=problem_type)
-
-        openml_metrics.generate_csv(path=args.save_path)
+        run(data, metrics_object)
