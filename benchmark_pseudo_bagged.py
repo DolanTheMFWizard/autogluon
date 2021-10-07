@@ -158,6 +158,48 @@ def get_metric(problem_type):
         return metrics.root_mean_squared_error
 
 
+def augmented_filter(self, X_aug, y_aug, X_real, y_real):
+    """ Filters out certain points from the augmented dataset so that it better matches the real data """
+    indices_to_drop = []
+    y_aug_hard = pd.Series(get_pred_from_proba(y_aug, problem_type=self.problem_type))
+    if self.problem_type == MULTICLASS:
+        y_aug = pd.DataFrame(y_aug)
+    else:
+        y_aug = pd.Series(y_aug)
+
+    # X_aug.reset_index(drop=True, inplace=True)
+    # y_aug.reset_index(drop=True, inplace=True)
+    # y_aug_hard.reset_index(drop=True, inplace=True)
+
+    if self.problem_type in [MULTICLASS, BINARY]:
+        p_y = y_real.value_counts(sort=False).sort_index() / len(y_real)
+        desired_class_cnts = p_y * len(y_aug_hard)
+        y_aug_cnts = y_aug_hard.value_counts(sort=False).sort_index()
+        if len(y_aug_cnts) != len(p_y):  # some classes were never predicted, so cannot match label distributions
+            return X_aug, y_aug
+
+        scaling = np.min(y_aug_cnts / desired_class_cnts)
+        desired_class_cnts = scaling * desired_class_cnts
+        desired_class_cnts = np.maximum(np.floor(desired_class_cnts), 1).astype(int)
+        num_to_drop = np.maximum(0, y_aug_cnts - desired_class_cnts)
+        for clss in p_y.index.values.tolist():
+            if clss in y_aug_cnts.index:
+                print("clss", clss)
+                clss_inds = y_aug_hard[y_aug_hard == clss].index.tolist()
+                print("clss_inds", clss_inds)
+                indices_to_drop += clss_inds[:num_to_drop[clss]]
+
+    if len(indices_to_drop) == 0:
+        return X_aug, y_aug
+
+    y_aug.drop(indices_to_drop, inplace=True)
+    y_aug.reset_index(drop=True, inplace=True)
+    X_aug.drop(indices_to_drop, inplace=True)
+    X_aug.reset_index(drop=True, inplace=True)
+    print(f"Augmented training dataset has {len(X_aug)} datapoints after augmented_filter")
+    return X_aug, y_aug
+
+
 def filter_bagged_regression_pseudo(bagged_model: BaggedEnsembleModel, X_test_data):
     list_child_models = bagged_model.models
     first_child_model = bagged_model.load_child(list_child_models[0])
@@ -373,7 +415,7 @@ def run(openml_id: int, threshold: float, max_iter: int, open_ml_metrics: Open_M
                                                                                            test_data=test_data,
                                                                                            label=label)
 
-    if len(features) > 40000 or problem_type in CLASSIFICATION:
+    if len(features) < 40000 or problem_type in CLASSIFICATION:
         return None
 
     eval_metric = get_metric(problem_type=problem_type)
@@ -393,30 +435,30 @@ def run(openml_id: int, threshold: float, max_iter: int, open_ml_metrics: Open_M
 
     is_classification = problem_type in CLASSIFICATION
 
-    if is_classification:
-        run_pseudo_label(best_model=model_vanilla, X_clean=X_clean.copy(), y_clean=y_clean.copy(),
-                         X_test_clean=X_test_clean.copy(), y_test_clean=y_test_clean.copy(),
-                         previous_val_score=val_score_vanilla, y_pred=y_pred_vanilla_series.copy(),
-                         y_pred_proba=y_test_pred_proba_df.copy(), max_iter=max_iter, use_ECE=True,
-                         problem_type=problem_type, label_cleaner=label_cleaner, threshold=threshold,
-                         eval_metric=eval_metric, open_ml_id=openml_id, open_ml_metrics=open_ml_metrics,
-                         use_Jonas=True, use_new_regression=False)
-
-        run_pseudo_label(best_model=model_vanilla, X_clean=X_clean.copy(), y_clean=y_clean.copy(),
-                         X_test_clean=X_test_clean.copy(), y_test_clean=y_test_clean.copy(),
-                         previous_val_score=val_score_vanilla, y_pred=y_pred_vanilla_series.copy(),
-                         y_pred_proba=y_test_pred_proba_df.copy(), max_iter=max_iter, use_ECE=True,
-                         problem_type=problem_type, label_cleaner=label_cleaner, threshold=threshold,
-                         eval_metric=eval_metric, open_ml_id=openml_id, open_ml_metrics=open_ml_metrics,
-                         use_Jonas=False, use_new_regression=False)
-    else:
-        run_pseudo_label(best_model=model_vanilla, X_clean=X_clean.copy(), y_clean=y_clean.copy(),
-                         X_test_clean=X_test_clean.copy(), y_test_clean=y_test_clean.copy(),
-                         previous_val_score=val_score_vanilla, y_pred=y_pred_vanilla_series.copy(),
-                         y_pred_proba=y_test_pred_proba_df.copy(), max_iter=max_iter, use_ECE=True,
-                         problem_type=problem_type, label_cleaner=label_cleaner, threshold=threshold,
-                         eval_metric=eval_metric, open_ml_id=openml_id, open_ml_metrics=open_ml_metrics,
-                         use_Jonas=False, use_new_regression=True)
+    # if is_classification:
+    #     run_pseudo_label(best_model=model_vanilla, X_clean=X_clean.copy(), y_clean=y_clean.copy(),
+    #                      X_test_clean=X_test_clean.copy(), y_test_clean=y_test_clean.copy(),
+    #                      previous_val_score=val_score_vanilla, y_pred=y_pred_vanilla_series.copy(),
+    #                      y_pred_proba=y_test_pred_proba_df.copy(), max_iter=max_iter, use_ECE=True,
+    #                      problem_type=problem_type, label_cleaner=label_cleaner, threshold=threshold,
+    #                      eval_metric=eval_metric, open_ml_id=openml_id, open_ml_metrics=open_ml_metrics,
+    #                      use_Jonas=True, use_new_regression=False)
+    #
+    #     run_pseudo_label(best_model=model_vanilla, X_clean=X_clean.copy(), y_clean=y_clean.copy(),
+    #                      X_test_clean=X_test_clean.copy(), y_test_clean=y_test_clean.copy(),
+    #                      previous_val_score=val_score_vanilla, y_pred=y_pred_vanilla_series.copy(),
+    #                      y_pred_proba=y_test_pred_proba_df.copy(), max_iter=max_iter, use_ECE=True,
+    #                      problem_type=problem_type, label_cleaner=label_cleaner, threshold=threshold,
+    #                      eval_metric=eval_metric, open_ml_id=openml_id, open_ml_metrics=open_ml_metrics,
+    #                      use_Jonas=False, use_new_regression=False)
+    # else:
+    #     run_pseudo_label(best_model=model_vanilla, X_clean=X_clean.copy(), y_clean=y_clean.copy(),
+    #                      X_test_clean=X_test_clean.copy(), y_test_clean=y_test_clean.copy(),
+    #                      previous_val_score=val_score_vanilla, y_pred=y_pred_vanilla_series.copy(),
+    #                      y_pred_proba=y_test_pred_proba_df.copy(), max_iter=max_iter, use_ECE=True,
+    #                      problem_type=problem_type, label_cleaner=label_cleaner, threshold=threshold,
+    #                      eval_metric=eval_metric, open_ml_id=openml_id, open_ml_metrics=open_ml_metrics,
+    #                      use_Jonas=False, use_new_regression=True)
 
     run_pseudo_label(best_model=model_vanilla, X_clean=X_clean.copy(), y_clean=y_clean.copy(),
                      X_test_clean=X_test_clean.copy(), y_test_clean=y_test_clean.copy(),
