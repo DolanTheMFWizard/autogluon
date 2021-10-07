@@ -193,7 +193,7 @@ def temperature_scale(predictor: TabularPredictor, y_pred_proba: pd.DataFrame,
     y = torch.tensor(y_validation_data.values)
 
     nll_criterion = torch.nn.NLLLoss().cuda()
-    optimizer = torch.optim.LBFGS([temperature_param], lr=0.01, max_iter=100)
+    optimizer = torch.optim.LBFGS([temperature_param], lr=0.01, max_iter=1000)
 
     def run():
         optimizer.zero_grad()
@@ -207,7 +207,7 @@ def temperature_scale(predictor: TabularPredictor, y_pred_proba: pd.DataFrame,
     optimizer.step(run)
 
     output = y_pred_proba / temperature_param[0].item()
-    output = output / output.sum(axis=1)
+    output = output.divide(output.sum(axis=1), axis=0)
 
     return output, output.idxmax(axis=1)
 
@@ -225,7 +225,7 @@ def epsilon_shift(predictor: TabularPredictor, y_pred_proba: pd.DataFrame,
     y = torch.tensor(y_validation_data.values)
 
     nll_criterion = torch.nn.NLLLoss().cuda()
-    optimizer = torch.optim.LBFGS([epsilon_param], lr=0.01, max_iter=100)
+    optimizer = torch.optim.LBFGS([epsilon_param], lr=0.01, max_iter=1000)
 
     def run():
         optimizer.zero_grad()
