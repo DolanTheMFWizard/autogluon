@@ -187,8 +187,8 @@ def temperature_scale(predictor: TabularPredictor, y_pred_proba: pd.DataFrame,
     X_validation_data = validation_data.drop(columns=[label])
     y_validation_data = validation_data[label]
     val_pred_proba = predictor.predict_proba(data=X_validation_data)
-    logits_df = inverse_softmax(y_pred_proba=val_pred_proba)
-    logits = torch.tensor(logits_df.values)
+    # logits_df = inverse_softmax(y_pred_proba=val_pred_proba)
+    logits = torch.tensor(val_pred_proba.values)
     y_validation_data = predictor._learner.label_cleaner.transform(y_validation_data)
     y = torch.tensor(y_validation_data.values)
 
