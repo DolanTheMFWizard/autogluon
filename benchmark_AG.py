@@ -151,7 +151,7 @@ def balance_pseudo(y_pred_proba_og: pd.DataFrame, X_test: pd.DataFrame, y_label:
     X[predictor.label] = y_pred
     pseudo_indices = pd.Series(data=False, index=X_test.index)
     pseudo_indices.loc[y_pred.index] = True
-    PL_predictor = TabularPredictor(label=predictor.label).fit(train_data=X)
+    PL_predictor = TabularPredictor(label=predictor.label, eval_metric=eval_metric).fit(train_data=X)
     train_data = X_test.loc[pseudo_indices[pseudo_indices == False].index]
 
     if len(train_data) == 0:
@@ -175,7 +175,7 @@ def balance_pseudo_no_holdouts(y_pred_proba_og: pd.DataFrame, X_test: pd.DataFra
     X[predictor.label] = y_pred
     pseudo_indices = pd.Series(data=False, index=X_test.index)
     pseudo_indices.loc[y_pred.index] = True
-    PL_predictor = TabularPredictor(label=predictor.label).fit(train_data=X)
+    PL_predictor = TabularPredictor(label=predictor.label, eval_metric=eval_metric).fit(train_data=X)
     y_pred_proba = PL_predictor.predict_proba(data=X_test)
 
     return y_pred_proba, y_pred_proba.idxmax(axis=1), PL_predictor
@@ -258,9 +258,11 @@ if __name__ == "__main__":
                  23512, 41146, 41169, 41027, 23517, 40685, 41165, 41161, 41159, 4135, 40996, 41138, 41166, 1464, 41168,
                  41150, 1489, 41142, 3, 12, 31, 1067, 54, 1590] + [23381, 1476, 1459, 23380, 40496, 40971, 1515, 1467,
                                                                    1479, 40499, 40966, 40982, 1485, 6332, 1462,
-                 1480, 1510, 40994, 40983, 40978, 1468, 40670, 40981, 40984, 40701, 40975, 1486, 1461, 40668, 41027,
-                 1464, 40536, 1590, 23517, 15, 11, 37, 29, 334, 335, 333, 50, 451, 1038, 1046, 188, 42, 307, 54, 470,
-                 469, 151, 458, 377, 375, 1063]
+                                                                   1480, 1510, 40994, 40983, 40978, 1468, 40670, 40981,
+                                                                   40984, 40701, 40975, 1486, 1461, 40668, 41027,
+                                                                   1464, 40536, 1590, 23517, 15, 11, 37, 29, 334, 335,
+                                                                   333, 50, 451, 1038, 1046, 188, 42, 307, 54, 470,
+                                                                   469, 151, 458, 377, 375, 1063]
 
     openml_metrics = Open_ML_Metrics()
     percent_test = args.test_percent
