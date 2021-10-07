@@ -193,15 +193,14 @@ def temperature_scale(predictor: TabularPredictor, y_pred_proba: pd.DataFrame,
     y_validation_data = predictor._learner.label_cleaner.transform(y_validation_data)
     y = torch.tensor(y_validation_data.values)
 
-    nll_criterion = torch.nn.NLLLoss().cuda()
+    nll_criterion = torch.nn.CrossEntropyLoss().cuda()
     optimizer = torch.optim.LBFGS([temperature_param], lr=0.01, max_iter=1000)
 
     def run():
         optimizer.zero_grad()
         temperature = temperature_param.unsqueeze(1).expand(logits.size(0), logits.size(1))
         curr_probs = logits / temperature
-        curr_probs = torch.softmax(curr_probs, dim=1)
-        loss = nll_criterion(curr_probs, y)
+        loss = -1 * nll_criterion(curr_probs, y)
         loss.backward()
         return loss
 
@@ -280,7 +279,7 @@ if __name__ == "__main__":
 
         problem_type = infer_problem_type(target)
 
-        if problem_type != MU:
+        if problem_type != MU or len(features) > 10000:
             print(f'Id: {id} is not multiclass')
             continue
 
