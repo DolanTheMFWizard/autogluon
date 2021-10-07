@@ -3,6 +3,7 @@ import argparse
 import autogluon.core.metrics as metrics
 import numpy as np
 import pandas as pd
+import scipy.special
 import torch
 from autogluon.core.utils import infer_problem_type
 from autogluon.core.utils.utils import default_holdout_frac
@@ -187,8 +188,8 @@ def temperature_scale(predictor: TabularPredictor, y_pred_proba: pd.DataFrame,
     X_validation_data = validation_data.drop(columns=[label])
     y_validation_data = validation_data[label]
     val_pred_proba = predictor.predict_proba(data=X_validation_data)
-    # logits_df = inverse_softmax(y_pred_proba=val_pred_proba)
-    logits = torch.tensor(val_pred_proba.values)
+    logits_df = inverse_softmax(y_pred_proba=val_pred_proba)
+    logits = torch.tensor(logits_df.values)
     y_validation_data = predictor._learner.label_cleaner.transform(y_validation_data)
     y = torch.tensor(y_validation_data.values)
 
@@ -199,15 +200,16 @@ def temperature_scale(predictor: TabularPredictor, y_pred_proba: pd.DataFrame,
         optimizer.zero_grad()
         temperature = temperature_param.unsqueeze(1).expand(logits.size(0), logits.size(1))
         curr_probs = logits / temperature
-        curr_probs = curr_probs / curr_probs.sum(dim=1)[:, None]
+        curr_probs = torch.softmax(curr_probs, dim=1)
         loss = nll_criterion(curr_probs, y)
         loss.backward()
         return loss
 
     optimizer.step(run)
 
-    output = y_pred_proba / temperature_param[0].item()
-    output = output.divide(output.sum(axis=1), axis=0)
+    logits = inverse_softmax(y_pred_proba)
+    output = logits / temperature_param[0].item()
+    output = scipy.special.softmax(output, axis=1)
 
     return output, output.idxmax(axis=1)
 
