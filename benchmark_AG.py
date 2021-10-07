@@ -361,4 +361,8 @@ if __name__ == "__main__":
             print(e)
             continue
 
-        run(data, metrics_object)
+        try:
+            run(data, metrics_object)
+        except Exception as e:
+            print(e)
+            continue
