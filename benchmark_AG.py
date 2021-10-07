@@ -3,7 +3,6 @@ import argparse
 import autogluon.core.metrics as metrics
 import numpy as np
 import pandas as pd
-import scipy
 import torch
 from autogluon.core.utils import infer_problem_type
 from autogluon.core.utils.utils import default_holdout_frac
@@ -51,7 +50,7 @@ def augmented_filter(X_aug, y_aug, y_real):
 
 
 def get_test_score(y_test_clean, y_pred, y_pred_proba, problem_type):
-    auc, acc, neg_mae, neg_mse, result, neg_log_loss = None, None, None, None, None, None,
+    auc, acc, neg_mae, neg_mse, result, neg_log_loss = None, None, None, None, None, None
 
     if problem_type in CLASSIFICATION:
         acc = metrics.accuracy(y_test_clean, y_pred)
@@ -60,7 +59,12 @@ def get_test_score(y_test_clean, y_pred, y_pred_proba, problem_type):
         auc = metrics.roc_auc(y_test_clean, y_pred)
         result = auc
     elif problem_type == MU:
-        neg_log_loss = metrics.log_loss(y_test_clean, y_pred_proba)
+        try:
+            neg_log_loss = metrics.log_loss(y_test_clean, y_pred_proba)
+        except Exception as e:
+            from sklearn.metrics import log_loss
+            neg_log_loss = -1 * log_loss(y_test_clean, y_pred_proba)
+
         result = neg_log_loss
     else:
         neg_mse = metrics.mean_squared_error(y_test_clean, y_pred)
@@ -188,19 +192,22 @@ def temperature_scale(predictor: TabularPredictor, y_pred_proba: pd.DataFrame,
     y_validation_data = predictor._learner.label_cleaner.transform(y_validation_data)
     y = torch.tensor(y_validation_data.values)
 
-    nll_criterion = torch.nn.CrossEntropyLoss().cuda()
-    optimizer = torch.optim.LBFGS([temperature_param], lr=0.1, max_iter=1000)
+    nll_criterion = torch.nn.NLLLoss().cuda()
+    optimizer = torch.optim.LBFGS([temperature_param], lr=0.01, max_iter=100)
 
     def run():
         optimizer.zero_grad()
         temperature = temperature_param.unsqueeze(1).expand(logits.size(0), logits.size(1))
-        loss = -1 * nll_criterion(logits / temperature, y)
+        curr_probs = logits / temperature
+        curr_probs = curr_probs / curr_probs.sum(dim=1)[:, None]
+        loss = nll_criterion(curr_probs, y)
         loss.backward()
         return loss
 
     optimizer.step(run)
 
-    output = scipy.special.softmax(inverse_softmax(y_pred_proba) / temperature_param[0].item(), axis=1)
+    output = y_pred_proba / temperature_param[0].item()
+    output = output / output.sum(axis=1)
 
     return output, output.idxmax(axis=1)
 
@@ -218,7 +225,7 @@ def epsilon_shift(predictor: TabularPredictor, y_pred_proba: pd.DataFrame,
     y = torch.tensor(y_validation_data.values)
 
     nll_criterion = torch.nn.NLLLoss().cuda()
-    optimizer = torch.optim.LBFGS([epsilon_param], lr=0.1, max_iter=1000)
+    optimizer = torch.optim.LBFGS([epsilon_param], lr=0.01, max_iter=100)
 
     def run():
         optimizer.zero_grad()
@@ -246,11 +253,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # AutoML Benchmark
-    # benchmark = [1468, 1596, 40981, 40984, 40975, 41163, 41147, 1111, 41164, 1169, 1486, 41143, 1461, 41167, 40668,
-    #              23512, 41146, 41169, 41027, 23517, 40685, 41165, 41161, 41159, 4135, 40996, 41138, 41166, 1464, 41168,
-    #              41150, 1489, 41142, 3, 12, 31, 1067, 54, 1590]
-
-    benchmark = [23381, 1468, 1476, 1459, 23380, 40496, 40971, 1515, 1467, 1479, 40499, 40966, 40982, 1485, 6332, 1462,
+    benchmark = [1468, 1596, 40981, 40984, 40975, 41163, 41147, 1111, 41164, 1169, 1486, 41143, 1461, 41167, 40668,
+                 23512, 41146, 41169, 41027, 23517, 40685, 41165, 41161, 41159, 4135, 40996, 41138, 41166, 1464, 41168,
+                 41150, 1489, 41142, 3, 12, 31, 1067, 54, 1590] + [23381, 1476, 1459, 23380, 40496, 40971, 1515, 1467,
+                                                                   1479, 40499, 40966, 40982, 1485, 6332, 1462,
                  1480, 1510, 40994, 40983, 40978, 1468, 40670, 40981, 40984, 40701, 40975, 1486, 1461, 40668, 41027,
                  1464, 40536, 1590, 23517, 15, 11, 37, 29, 334, 335, 333, 50, 451, 1038, 1046, 188, 42, 307, 54, 470,
                  469, 151, 458, 377, 375, 1063]
@@ -261,7 +267,9 @@ if __name__ == "__main__":
     for id in benchmark:
         try:
             data = fetch_openml(data_id=id, as_frame=True)
+            print(f'Running open ml Id: {id}')
         except Exception as e:
+            print(e)
             continue
 
         features = data['data']
@@ -270,7 +278,8 @@ if __name__ == "__main__":
 
         problem_type = infer_problem_type(target)
 
-        if problem_type not in CLASSIFICATION:
+        if problem_type != MU:
+            print(f'Id: {id} is not multiclass')
             continue
 
         if problem_type is BI:
