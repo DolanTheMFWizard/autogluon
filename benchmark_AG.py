@@ -252,6 +252,10 @@ def run(open_ml_data, open_ml_metrics):
 
     problem_type = infer_problem_type(target)
 
+    if len(features) > 10000:
+        print(f'Id: {id} is over 10000 rows')
+        return
+
     if problem_type != MU:
         print(f'Id: {id} is not multiclass')
         return
