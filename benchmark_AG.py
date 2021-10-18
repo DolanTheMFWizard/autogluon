@@ -15,9 +15,8 @@ MU = 'multiclass'
 CLASSIFICATION = [BI, MU]
 
 
-def augmented_filter(X_aug, y_aug, y_real):
+def augmented_filter(X_aug, y_aug, y_real, problem_type):
     """ Filters out certain points from the augmented dataset so that it better matches the real data """
-    problem_type = MU if len(y_aug.columns) > 2 else BI
     indices_to_drop = []
     y_aug_hard = pd.Series(y_aug.idxmax(axis="columns"))
     if problem_type == MU:
