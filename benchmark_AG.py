@@ -334,11 +334,6 @@ if __name__ == "__main__":
         try:
             data = fetch_openml(data_id=id, as_frame=True)
             print(f'Running open ml Id: {id}')
-        except Exception as e:
-            print(e)
-            continue
-
-        try:
             run(data, metrics_object)
         except Exception as e:
             print(e)
