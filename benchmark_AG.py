@@ -15,14 +15,11 @@ MU = 'multiclass'
 CLASSIFICATION = [BI, MU]
 
 
-def augmented_filter(X_aug, y_aug, y_real, problem_type):
+def augmented_filter(y_aug, y_real):
     """ Filters out certain points from the augmented dataset so that it better matches the real data """
     indices_to_drop = []
     y_aug_hard = pd.Series(y_aug.idxmax(axis="columns"))
-    if problem_type == MU:
-        y_aug = pd.DataFrame(y_aug)
-    else:
-        y_aug = pd.Series(y_aug[y_aug.columns[-1]])
+    y_aug_df = y_aug.copy()
 
     p_y = y_real.value_counts(sort=False).sort_index() / len(y_real)
     desired_class_cnts = p_y * len(y_aug_hard)
@@ -39,14 +36,11 @@ def augmented_filter(X_aug, y_aug, y_real, problem_type):
             print("clss", clss)
             clss_inds = y_aug_hard[y_aug_hard == clss].index.tolist()
             print("clss_inds", clss_inds)
-            indices_to_drop += clss_inds[:num_to_drop[clss]]
+            indices_to_drop += list(y_aug_df.max(axis=1)[clss_inds].sort_values()[:num_to_drop[clss]].index)
 
-    if len(indices_to_drop) == 0:
-        return None
-
-    y_aug.drop(indices_to_drop)
-    print(f"Augmented training dataset has {len(y_aug)} datapoints after augmented_filter")
-    return y_aug
+    y_aug_df = y_aug_df.drop(indices_to_drop)
+    print(f"Augmented training dataset has {len(y_aug_df)} datapoints after augmented_filter")
+    return y_aug_df
 
 
 def get_test_score(y_test_clean, y_pred, y_pred_proba, problem_type):
@@ -138,8 +132,9 @@ def inverse_softmax(y_pred_proba: pd.DataFrame):
     return np.log2(y_pred_proba)
 
 
-def balance_pseudo(y_pred_proba_og: pd.DataFrame, X_test: pd.DataFrame, y_label: pd.DataFrame, predictor):
-    y_pred_proba = augmented_filter(X_aug=X_test.copy(), y_aug=y_pred_proba_og.copy(), y_real=y_label.copy())
+def balance_pseudo(y_pred_proba_og: pd.DataFrame, X_test: pd.DataFrame, y_label: pd.DataFrame,
+                   predictor: TabularPredictor):
+    y_pred_proba = augmented_filter(y_aug=y_pred_proba_og.copy(), y_real=y_label.copy())
 
     if y_pred_proba is None:
         return y_pred_proba_og, y_pred_proba_og.idxmax(axis=1), predictor
@@ -163,8 +158,9 @@ def balance_pseudo(y_pred_proba_og: pd.DataFrame, X_test: pd.DataFrame, y_label:
     return y_pred_proba_holdout, y_pred_proba_holdout.idxmax(axis=1), PL_predictor
 
 
-def balance_pseudo_no_holdouts(y_pred_proba_og: pd.DataFrame, X_test: pd.DataFrame, y_label: pd.DataFrame, predictor):
-    y_pred_proba = augmented_filter(X_aug=X_test.copy(), y_aug=y_pred_proba_og.copy(), y_real=y_label.copy())
+def balance_pseudo_no_holdouts(y_pred_proba_og: pd.DataFrame, X_test: pd.DataFrame, y_label: pd.DataFrame,
+                               predictor: TabularPredictor):
+    y_pred_proba = augmented_filter(y_aug=y_pred_proba_og.copy(), y_real=y_label.copy())
 
     if y_pred_proba is None:
         return y_pred_proba_og, y_pred_proba_og.idxmax(axis=1), predictor
@@ -285,28 +281,6 @@ def run(open_ml_data, open_ml_metrics):
     open_ml_metrics.add(model_name='Vanilla', eval_p=predictor._trainer.leaderboard()['score_val'][0], openml_id=id,
                         accuracy=acc, auc=auc, neg_logloss=neg_log_loss, MAE=neg_mae, neg_MSE=neg_mse, result=result,
                         metric=eval_metric, problem_type=problem_type)
-
-    y_pred_proba_temp, y_pred_temp = temperature_scale(predictor=predictor, y_pred_proba=y_pred_proba,
-                                                       validation_data=validation_data, y_label=y)
-
-    result, auc, neg_log_loss, acc, neg_mae, neg_mse = get_test_score(y_test_clean=y, y_pred=y_pred_temp,
-                                                                      y_pred_proba=y_pred_proba_temp,
-                                                                      problem_type=problem_type)
-
-    open_ml_metrics.add(model_name='Temperature', eval_p=predictor._trainer.leaderboard()['score_val'][0],
-                        openml_id=id, accuracy=acc, auc=auc, neg_logloss=neg_log_loss, MAE=neg_mae, neg_MSE=neg_mse,
-                        result=result, metric=eval_metric, problem_type=problem_type)
-
-    y_pred_proba_ep, y_pred_ep = epsilon_shift(predictor=predictor, y_pred_proba=y_pred_proba,
-                                               validation_data=validation_data, y_label=y)
-
-    result, auc, neg_log_loss, acc, neg_mae, neg_mse = get_test_score(y_test_clean=y, y_pred=y_pred_ep,
-                                                                      y_pred_proba=y_pred_proba_ep,
-                                                                      problem_type=problem_type)
-
-    open_ml_metrics.add(model_name='Epsilon', eval_p=predictor._trainer.leaderboard()['score_val'][0],
-                        openml_id=id, accuracy=acc, auc=auc, neg_logloss=neg_log_loss, MAE=neg_mae, neg_MSE=neg_mse,
-                        result=result, metric=eval_metric, problem_type=problem_type)
 
     y_pred_proba_Jonas, y_pred_Jonas, PL_predictor = balance_pseudo(y_pred_proba_og=y_pred_proba, X_test=test_data,
                                                                     y_label=y, predictor=predictor)
