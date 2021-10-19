@@ -22,6 +22,7 @@ requirements = [
     'scipy',
     'pandas',
     'scikit-learn',
+    'autofeat',
 
     'psutil>=5.7.3,<5.9',  # TODO: Consider capping to <6.0 instead, capping to 5.9 to avoid possible issues.
     'networkx>=2.3,<3.0',
