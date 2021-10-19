@@ -1,11 +1,17 @@
 import logging
 
+import numpy as np
 from autogluon.core.trainer.abstract_trainer import AbstractTrainer
 from autogluon.core.utils import generate_train_test_split
 
 from .model_presets.presets import get_preset_models
 from .model_presets.presets_distill import get_preset_models_distillation
 from ..models.lgb.lgb_model import LGBModel
+
+from autoimpute.imputations import SingleImputer
+from autofeat import AutoFeatRegressor, AutoFeatClassifier
+
+from autogluon.core.constants import PROBLEM_TYPES_CLASSIFICATION
 
 logger = logging.getLogger(__name__)
 
@@ -34,9 +40,37 @@ class AutoTrainer(AbstractTrainer):
                                  invalid_model_names=invalid_model_names,
                                  silent=silent, **kwargs)
 
-    def fit(self, X, y, hyperparameters, X_val=None, y_val=None, X_unlabeled=None, holdout_frac=0.1, num_stack_levels=0, core_kwargs: dict = None, time_limit=None, use_bag_holdout=False, groups=None, **kwargs):
+    def _fit_auto_impute_and_auto_feat(self, X: np.ndarray, y: np.ndarray):
+        if len(X.squeeze().shape) < 2:
+            return X
+
+        self.auto_imputer = SingleImputer()
+
+        if self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
+            self.auto_feat = AutoFeatClassifier(verbose=1, feateng_steps=3, units={})
+        else:
+            self.auto_feat = AutoFeatRegressor(verbose=1, feateng_steps=3, units={})
+
+        try:
+            X = self.auto_imputer.fit_transform(X=X, y=y)
+            X = self.auto_feat.fit_transform(X=X, y=y)
+        except Exception as e:
+            self.auto_feat = None
+            self.auto_imputer = None
+            logger.warning('Auto feat or auto imputer failed!')
+
+        return X
+
+
+    def fit(self, X, y, hyperparameters, X_val=None, y_val=None, X_unlabeled=None,
+            holdout_frac=0.1, num_stack_levels=0, core_kwargs: dict = None, time_limit=None,
+            use_bag_holdout=False, groups=None, use_feat_generator: bool = False, **kwargs):
         for key in kwargs:
             logger.warning(f'Warning: Unknown argument passed to `AutoTrainer.fit()`. Argument: {key}')
+
+        if use_feat_generator:
+            X = self._fit_auto_impute_and_auto_feat(X, y)
+
 
         if (y_val is None) or (X_val is None):
             if not self.bagged_mode or use_bag_holdout:

@@ -275,6 +275,7 @@ class TabularPredictor:
             presets=None,
             hyperparameters=None,
             feature_metadata='infer',
+            use_feat_generator:bool=False,
             **kwargs):
         """
         Fit models to predict a column of a data table (label) based on the other columns (features).
@@ -757,7 +758,8 @@ class TabularPredictor:
         self.save(silent=True)  # Save predictor to disk to enable prediction and training after interrupt
         self._learner.fit(X=train_data, X_val=tuning_data, X_unlabeled=unlabeled_data,
                           holdout_frac=holdout_frac, num_bag_folds=num_bag_folds, num_bag_sets=num_bag_sets, num_stack_levels=num_stack_levels,
-                          hyperparameters=hyperparameters, core_kwargs=core_kwargs, time_limit=time_limit, verbosity=verbosity, use_bag_holdout=use_bag_holdout)
+                          hyperparameters=hyperparameters, core_kwargs=core_kwargs, time_limit=time_limit, verbosity=verbosity, use_bag_holdout=use_bag_holdout,
+                          use_feat_generator=use_feat_generator)
         self._set_post_fit_vars()
 
         self._post_fit(
@@ -2325,6 +2327,8 @@ class TabularPredictor:
 
             # quantile levels
             quantile_levels=None,
+
+            use_feat_generator=None
         )
 
         allowed_kwarg_names = list(fit_extra_kwargs_default.keys())

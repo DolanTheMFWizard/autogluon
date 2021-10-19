@@ -98,6 +98,8 @@ class AbstractTrainer:
 
         self._extra_banned_names = set()  # Names which are banned but are not used by a trained model.
 
+        self.auto_imputer = None
+        self.auto_feat = None
         # self._exceptions_list = []  # TODO: Keep exceptions list for debugging during benchmarking.
 
     # path_root is the directory containing learner.pkl
@@ -410,14 +412,23 @@ class AbstractTrainer:
                 X_stack_preds[self.sample_weight] = w.values/w.mean()
         return self.generate_weighted_ensemble(X=X_stack_preds, y=y, level=level, base_model_names=base_model_names, k_fold=1, n_repeats=1, stack_name=stack_name, time_limit=time_limit, name_suffix=name_suffix, get_models_func=get_models_func, check_if_best=check_if_best)
 
+    def _auto_impute_and_feature_generate(self, X):
+        if self.auto_feat is not None and self.auto_imputer is not None:
+            X = self.auto_imputer.transform(X)
+            X = self.auto_feat.transform(X)
+
+        return X
+
     def predict(self, X, model=None):
         if model is None:
             model = self._get_best()
+        X = self._auto_impute_and_feature_generate(X)
         return self._predict_model(X, model)
 
     def predict_proba(self, X, model=None):
         if model is None:
             model = self._get_best()
+        X = self._auto_impute_and_feature_generate(X)
         return self._predict_proba_model(X, model)
 
     def _get_best(self):
