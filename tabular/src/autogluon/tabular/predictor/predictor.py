@@ -843,7 +843,7 @@ class TabularPredictor:
 
         y_val_tensor = torch.tensor(y_val)
         temperature_param = torch.nn.Parameter(torch.ones(1))
-        logits = torch.tensor(np.log(y_val_probs))
+        logits = torch.tensor(np.log2(y_val_probs))
         nll_criterion = torch.nn.CrossEntropyLoss()
         optimizer = torch.optim.LBFGS([temperature_param], lr=lr, max_iter=max_iter)
 

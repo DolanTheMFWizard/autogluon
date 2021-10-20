@@ -571,7 +571,7 @@ class AbstractModel:
             if self.problem_type == BINARY:
                 y_pred_proba = np.column_stack([1 - y_pred_proba, y_pred_proba])
 
-            logits = np.log(y_pred_proba)
+            logits = np.log2(y_pred_proba)
             y_pred_proba = scipy.special.softmax(logits/self.temperature_scalar, axis=1)
             y_pred_proba = y_pred_proba / y_pred_proba.sum(axis=1, keepdims=True)
 
