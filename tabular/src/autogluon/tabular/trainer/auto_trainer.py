@@ -64,12 +64,9 @@ class AutoTrainer(AbstractTrainer):
 
     def fit(self, X, y, hyperparameters, X_val=None, y_val=None, X_unlabeled=None,
             holdout_frac=0.1, num_stack_levels=0, core_kwargs: dict = None, time_limit=None,
-            use_bag_holdout=False, groups=None, use_feat_generator: bool = False, **kwargs):
+            use_bag_holdout=False, groups=None, **kwargs):
         for key in kwargs:
             logger.warning(f'Warning: Unknown argument passed to `AutoTrainer.fit()`. Argument: {key}')
-
-        if use_feat_generator:
-            X = self._fit_auto_impute_and_auto_feat(X, y)
 
 
         if (y_val is None) or (X_val is None):
