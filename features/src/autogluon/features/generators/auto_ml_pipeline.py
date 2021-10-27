@@ -126,6 +126,5 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
             generator_group.append(IsNanFeatureGenerator(infer_features_in_args=dict(
                 valid_raw_types=[R_OBJECT], required_special_types=[S_IMAGE_PATH],
             )))
-        generator_group.append(AutoFeatAndAutoImpute())
         generators = [generator_group]
         return generators

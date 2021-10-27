@@ -27,16 +27,16 @@ class AutoFeatAndAutoImpute(AbstractFeatureGenerator):
         try:
             X = self.auto_impute.fit_transform(X=X, y=y)
             X = self.auto_feat.fit_transform(X=X, y=y)
+            return X, self.feature_metadata_in.type_group_map_special
         except Exception as e:
             logger.log(15, 'Auto feat or Auto impute failed to fit')
             self.auto_feat = None
             self.auto_impute = None
-
-        return X, self.feature_metadata_in.type_group_map_special
+            return pd.DataFrame(), self.feature_metadata_in.type_group_map_special
 
     def _transform(self, X: pd.DataFrame) -> pd.DataFrame:
         if self.auto_impute is None and self.auto_feat is None:
-            return X
+            return pd.DataFrame()
         else:
             X = self.auto_impute.transform(X)
             return self.auto_feat.transform(X)

@@ -273,7 +273,7 @@ def run_tabular_benchmarks(fast_benchmark, subsample_size, perf_threshold, seed_
                 if subsample_size < len(train_data):
                     # .sample instead of .head to increase diversity and test cases where data index is not monotonically increasing.
                     train_data = train_data.sample(n=subsample_size, random_state=seed_val)  # subsample for fast_benchmark
-            predictor = TabularPredictor(label=label, path=savedir).fit(train_data, use_feat_generator=True, **fit_args)
+            predictor = TabularPredictor(label=label, path=savedir).fit(train_data, **fit_args)
             results = predictor.fit_summary(verbosity=4)
             if predictor.problem_type != dataset['problem_type']:
                 warnings.warn("For dataset %s: Autogluon inferred problem_type = %s, but should = %s" % (dataset['name'], predictor.problem_type, dataset['problem_type']))
