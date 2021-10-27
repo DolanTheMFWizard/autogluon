@@ -1,6 +1,7 @@
 import logging
 
 from autogluon.core.features.types import R_INT, R_FLOAT, S_TEXT, R_OBJECT, S_IMAGE_PATH
+from autogluon.features.generators.autofeat_and_autoimpute import AutoFeatAndAutoImpute
 
 from .pipeline import PipelineFeatureGenerator
 from .category import CategoryFeatureGenerator
@@ -125,5 +126,6 @@ class AutoMLPipelineFeatureGenerator(PipelineFeatureGenerator):
             generator_group.append(IsNanFeatureGenerator(infer_features_in_args=dict(
                 valid_raw_types=[R_OBJECT], required_special_types=[S_IMAGE_PATH],
             )))
+        generator_group.append(AutoFeatAndAutoImpute())
         generators = [generator_group]
         return generators

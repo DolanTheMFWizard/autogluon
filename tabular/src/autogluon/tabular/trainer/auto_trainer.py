@@ -8,9 +8,6 @@ from .model_presets.presets import get_preset_models
 from .model_presets.presets_distill import get_preset_models_distillation
 from ..models.lgb.lgb_model import LGBModel
 
-from autoimpute.imputations import SingleImputer
-from autofeat import AutoFeatRegressor, AutoFeatClassifier
-
 from autogluon.core.constants import PROBLEM_TYPES_CLASSIFICATION
 
 logger = logging.getLogger(__name__)
