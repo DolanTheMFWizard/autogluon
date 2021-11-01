@@ -16,7 +16,6 @@ from ._tags import _DEFAULT_TAGS
 from .model_trial import model_trial
 from ... import metrics, Space
 from ...constants import AG_ARGS_FIT, BINARY, REGRESSION, QUANTILE, REFIT_FULL_SUFFIX, OBJECTIVES_TO_NORMALIZE, PROBLEM_TYPES_CLASSIFICATION
-from ...data.label_cleaner import LabelCleaner, LabelCleanerMulticlassToBinary
 from ...features.feature_metadata import FeatureMetadata
 from ...features.types import R_CATEGORY, R_OBJECT, R_FLOAT, R_INT
 from ...scheduler import FIFOScheduler
@@ -577,7 +576,7 @@ class AbstractModel:
             logits = np.log(y_pred_proba)
             weight = self.vector_weight.detach().numpy()
             bias = self.vector_bias.item()
-            y_pred_proba = scipy.special.softmax(logits * weight + bias , axis=1)
+            y_pred_proba = scipy.special.softmax(logits * weight + bias, axis=1)
             y_pred_proba = y_pred_proba / y_pred_proba.sum(axis=1, keepdims=True)
 
             if self.problem_type == BINARY:
