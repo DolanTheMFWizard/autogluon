@@ -102,7 +102,8 @@ class AbstractModel:
         self.model = None
         self.problem_type = problem_type
         # temperature scaling parameter that is set by predictor if calibrate is true under TabularPredictor fit()
-        self.temperature_scalar = None
+        self.vector_weight = None
+        self.vector_bias = None
 
         if eval_metric is not None:
             self.eval_metric = metrics.get_metric(eval_metric, self.problem_type, 'eval_metric')  # Note: we require higher values = better performance
@@ -569,12 +570,14 @@ class AbstractModel:
         self.model = self.model.fit(X, y)
 
     def _apply_temperature_scaling(self, y_pred_proba):
-        if self.temperature_scalar is not None and self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
+        if self.vector_weight is not None and self.vector_bias is not None and self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
             if self.problem_type == BINARY:
                 y_pred_proba = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_pred_proba)
 
             logits = np.log(y_pred_proba)
-            y_pred_proba = scipy.special.softmax(logits/self.temperature_scalar, axis=1)
+            weight = self.vector_weight.detach().numpy()
+            bias = self.vector_bias.item()
+            y_pred_proba = scipy.special.softmax(logits * weight + bias , axis=1)
             y_pred_proba = y_pred_proba / y_pred_proba.sum(axis=1, keepdims=True)
 
             if self.problem_type == BINARY:

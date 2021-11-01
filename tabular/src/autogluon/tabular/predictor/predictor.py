@@ -840,16 +840,18 @@ class TabularPredictor:
         import torch
 
         y_val_tensor = torch.tensor(y_val)
-        temperature_param = torch.nn.Parameter(torch.ones(1).fill_(init_val))
+        vector_weights_param = torch.nn.Parameter(torch.ones(y_val_probs.shape[1]).fill_(init_val))
+        vector_bias_param = torch.nn.Parameter(torch.zeros(1))
         logits = torch.tensor(np.log(y_val_probs))
         nll_criterion = torch.nn.CrossEntropyLoss()
-        optimizer = torch.optim.LBFGS([temperature_param], lr=lr, max_iter=max_iter)
+        optimizer = torch.optim.LBFGS([vector_weights_param, vector_bias_param], lr=lr, max_iter=max_iter)
         scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.99)
 
         def temperature_scale_step():
             optimizer.zero_grad()
-            temp = temperature_param.unsqueeze(1).expand(logits.size(0), logits.size(1))
-            new_logits = (logits / temp)
+            weight = vector_weights_param.expand(logits.size(0), logits.size(1))
+            bias = vector_bias_param
+            new_logits = (logits * weight + bias)
             loss = nll_criterion(new_logits, y_val_tensor)
             loss.backward()
             scheduler.step()
@@ -859,7 +861,8 @@ class TabularPredictor:
         optimizer.step(temperature_scale_step)
 
         model = self._trainer.load_model(model_name=model_name)
-        model.temperature_scalar = temperature_param[0].item()
+        model.vector_weight = vector_weights_param
+        model.vector_bias = vector_bias_param
         model.save()
 
     def fit_extra(self, hyperparameters, time_limit=None, base_model_names=None, **kwargs):
