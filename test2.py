@@ -19,8 +19,8 @@ train_data, test_data = load_data(directory_prefix=directory_prefix, train_file=
 
 test_data = test_data.drop(columns=[label])
 
-predictor = TabularPredictor(label=label).fit(train_data, time_limit=10)
-X, y, X_val, y_val, X_unlabeled, holdout_frac, num_bag_folds, groups = predictor._learner.general_data_processing(
+predictor_og = TabularPredictor(label=label).fit(train_data, time_limit=10)
+X, y, X_val, y_val, X_unlabeled, holdout_frac, num_bag_folds, groups = predictor_og._learner.general_data_processing(
     train_data, None, test_data, 0, 1)
 
 train_data = X.copy()
@@ -36,7 +36,7 @@ for feat in categorical_features:
 for feat in categorical_features:
     X_unlabeled[feat] = pd.to_numeric(X_unlabeled[feat])
 
-if predictor.problem_type == 'regression':
+if predictor_og.problem_type == 'regression':
     num_samples = int(len(train_data) / 2)
     train_sample_1 = train_data.sample(num_samples).reset_index(drop=True)
     train_sample_2 = train_data.sample(num_samples).reset_index(drop=True)
@@ -58,6 +58,6 @@ else:
     train_data.append(train_data_mixed).reset_index(drop=True)
 
 predictor = TabularPredictor(label=label).fit(train_data)
-predictor.predict(X_unlabeled)
+y_pred = predictor.predict_proba(X_unlabeled)
 
 print('')
