@@ -833,8 +833,8 @@ class TabularPredictor:
             y_val_probs = self._trainer.predict_proba(X_val, model_name)
             y_val = self._trainer.load_y_val().to_numpy()
 
-        if self.problem_type == BINARY:
-            y_val_probs = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_val_probs)
+            if self.problem_type == BINARY:
+                y_val_probs = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_val_probs)
 
         try_import_torch()
         import torch
