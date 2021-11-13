@@ -11,6 +11,7 @@ import pandas as pd
 import networkx as nx
 
 from autogluon.core.calibrate.temperature_scaling import tune_temperature_scaling
+from autogluon.core.calibrate.dirichlet_calibrate import dirichlet_calibrate
 from autogluon.core.data.label_cleaner import LabelCleanerMulticlassToBinary
 from autogluon.core.dataset import TabularDataset
 from autogluon.core.scheduler.scheduler_factory import scheduler_factory
@@ -844,12 +845,14 @@ class TabularPredictor:
             if self.problem_type == BINARY:
                 y_val_probs = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_val_probs)
 
-        logger.log(15, f'Temperature scaling term being tuned for model: {model_name}')
-        temp_scalar = tune_temperature_scaling(y_val_probs=y_val_probs, y_val=y_val,
-                                               init_val=init_val, max_iter=max_iter, lr=lr)
-        logger.log(15, f'Temperature term found is: {temp_scalar}')
+        # logger.log(15, f'Temperature scaling term being tuned for model: {model_name}')
+        # temp_scalar = tune_temperature_scaling(y_val_probs=y_val_probs, y_val=y_val,
+        #                                        init_val=init_val, max_iter=max_iter, lr=lr)
+        # logger.log(15, f'Temperature term found is: {temp_scalar}')
         model = self._trainer.load_model(model_name=model_name)
-        model.temperature_scalar = temp_scalar
+        # model.temperature_scalar = temp_scalar
+        logger.log(15, f'Dirichlet calibrate being tuned for model: {model_name}')
+        model.dirichlet_calibrator = dirichlet_calibrate(y_val_probs = y_val_probs, y_val = y_val)
         model.save()
 
     def fit_extra(self, hyperparameters, time_limit=None, base_model_names=None, **kwargs):
