@@ -586,6 +586,8 @@ class AbstractModel:
         if self.problem_type == BINARY:
             y_pred_proba = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_pred_proba)
 
+        logger.log(15, 'Applying dirichlet calibrate')
+
         y_pred_proba = self.dirichlet_calibrator.predict_proba(y_pred_proba)
         y_pred_proba = y_pred_proba / y_pred_proba.sum(axis=1, keepdims=True)
 
