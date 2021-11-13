@@ -59,7 +59,7 @@ def filter_pseudo(y_pred_proba_og, problem_type,
 
 
 def filter_pseudo_std_regression(predictor, test_data: pd.DataFrame, k: int = 5,
-                                 z_score_threshold: float = 0.5):
+                                 z_score_threshold: float = 0.25):
     top_k_models_list = list(predictor._trainer.leaderboard()['model'][:k])
     pred_proba_top_k = None
     for model in top_k_models_list:
@@ -143,4 +143,22 @@ def ensemble_classification_filter(unlabeled_data: pd.DataFrame, predictor, top_
     pseudo_indexes = (y_max_prob >= threshold)
     y_pred_ensemble = y_pred_proba_ensemble.idxmax(axis=1)
 
-    return pseudo_indexes[pseudo_indexes], y_pred_proba_ensemble, y_pred_ensemble
+    pseudo_idxmax = y_pred_proba_ensemble[pseudo_indexes].idxmax(axis=1)
+    pseudo_value_counts = pseudo_idxmax.value_counts()
+    min_count = pseudo_value_counts.min()
+    pseudo_keys = list(pseudo_value_counts.keys())
+
+    new_test_pseudo_indices = None
+    for k in pseudo_keys:
+        k_pseudo_idxes = pseudo_idxmax == k
+        selected_rows = k_pseudo_idxes[k_pseudo_idxes].head(min_count)
+
+        if new_test_pseudo_indices is None:
+            new_test_pseudo_indices = selected_rows.index
+        else:
+            new_test_pseudo_indices = new_test_pseudo_indices.append(selected_rows.index)
+
+    test_pseudo_indices = pd.Series(data=False, index=y_pred_proba_ensemble.index)
+    test_pseudo_indices.loc[new_test_pseudo_indices] = True
+
+    return test_pseudo_indices, y_pred_proba_ensemble, y_pred_ensemble
