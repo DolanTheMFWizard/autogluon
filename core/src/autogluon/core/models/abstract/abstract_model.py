@@ -589,7 +589,6 @@ class AbstractModel:
         logger.log(15, 'Applying dirichlet calibrate')
 
         y_pred_proba = self.dirichlet_calibrator.predict_proba(y_pred_proba)
-        y_pred_proba = y_pred_proba / y_pred_proba.sum(axis=1, keepdims=True)
 
         if self.problem_type == BINARY:
             y_pred_proba = y_pred_proba[:, 1]
