@@ -852,7 +852,9 @@ class TabularPredictor:
             weight = vector_weights_param.expand(logits.size(0), logits.size(1))
             bias = vector_bias_param
             new_logits = (logits * weight + bias)
+            l2_loss = torch.norm(vector_weights_param).sum()
             loss = nll_criterion(new_logits, y_val_tensor)
+            loss += l2_loss
             loss.backward()
             scheduler.step()
             return loss
