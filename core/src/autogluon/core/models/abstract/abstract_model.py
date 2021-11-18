@@ -570,6 +570,8 @@ class AbstractModel:
 
     def _apply_temperature_scaling(self, y_pred_proba):
         if self.vector_weight is not None and self.vector_bias is not None and self.problem_type in PROBLEM_TYPES_CLASSIFICATION:
+            logging.log(15, 'Applying vector scaling')
+
             if self.problem_type == BINARY:
                 y_pred_proba = LabelCleanerMulticlassToBinary.convert_binary_proba_to_multiclass_proba(y_pred_proba)
 

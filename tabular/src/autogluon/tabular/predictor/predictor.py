@@ -859,7 +859,7 @@ class TabularPredictor:
             scheduler.step()
             return loss
 
-        logger.log(15, f'Temperature scaling term being tuned for model: {model_name}')
+        logger.log(15, f'Vector scaling term being tuned for model: {model_name}')
         optimizer.step(temperature_scale_step)
 
         model = self._trainer.load_model(model_name=model_name)
