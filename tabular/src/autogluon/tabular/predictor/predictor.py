@@ -849,12 +849,14 @@ class TabularPredictor:
 
         def temperature_scale_step():
             optimizer.zero_grad()
-            weight = vector_weights_param.expand(logits.size(0), logits.size(1))
+            weight = vector_weights_param[None, :]
             bias = vector_bias_param
             new_logits = (logits * weight + bias)
-            l2_loss = 5 * torch.norm(vector_weights_param).sum()
+            l2_loss = torch.norm(vector_weights_param).sum()
+            l2_loss += torch.norm(bias).sum()
             loss = nll_criterion(new_logits, y_val_tensor)
-            loss += l2_loss
+            loss += 0.5 * l2_loss
+            loss = -1 * loss
             loss.backward()
             scheduler.step()
             return loss
